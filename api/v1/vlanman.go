@@ -1,0 +1,37 @@
+package v1
+
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type VlanNetwork struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   VlanNetworkSpec   `json:"spec,omitempty"`
+	Status VlanNetworkStatus `json:"status,omitempty"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type VlanNetworkList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []VlanNetwork `json:"items"`
+}
+
+type VlanNetworkSpec struct {
+	GatewayIP     string   `json:"gatewayIp"`
+	LocalSubnet   string   `json:"localSubnet"`
+	RemoteSubnet  string   `json:"remoteSubnet"`
+	VlanID        int      `json:"vlanId"`
+	ExcludedNodes []string `json:"excludedNodes,omitempty"`
+}
+
+type VlanNetworkStatus struct {
+	Active bool `json:"active"`
+}
+
+func init() {
+	SchemeBuilder.Register(&VlanNetwork{}, &VlanNetworkList{})
+}

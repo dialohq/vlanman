@@ -1,0 +1,22 @@
+apiVersion: v2
+appVersion: 1.16.0
+description: VLAN network manager
+name: vlanman
+type: application
+version: 0.0.0
+annotations:
+  artifacthub.io/category: "networking"
+  artifacthub.io/images: |
+    - name: vlanman
+      image: plan9better/vlanman:0.0.0
+      platforms:
+        - linux/amd64
+  artifacthub.io/crds: |
+    - kind: VlanNetwork
+      version: v1
+      name: vlannetwork
+      description: Defines the VLAN connection
+  artifacthub.io/license: MIT
+  artifacthub.io/recommendations: |
+    - https://artifacthub.io/packages/helm/cert-manager/cert-manager
+    - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack

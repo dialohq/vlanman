@@ -1,0 +1,54 @@
+# Default values for vlanman
+# This is a YAML-formatted file.
+# Global configuration
+global:
+  namespace: "vlanman-system"
+  monitoring:
+    enabled: false
+    interval: 5s
+    release: kube-prometheus-stack
+# Controller (operator) configuration
+controller:
+  podTimeoutSeconds: 60
+  replicaCount: 1
+  image: "192.168.10.201:5000/vlanman:latest-dev"
+  pullPolicy: Always
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+  resources: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+# Webhook configuration
+webhook:
+  serviceName: "vlanman-webhook-service"
+  mutatingWebhookName: "vlanman-mutating-webhook"
+  validatingWebhookName: "vlanman-validating-webhook"
+  certificate:
+    name: "vlanman-webhook-certificate"
+    secretName: "vlanman-webhook-cert-secret"
+    issuerName: "selfsigned-issuer"
+  volumes:
+    name: "webhook-certs"
+    mountPath: "/etc/webhook/certs"
+    readOnly: true
+# RBAC configuration
+rbac:
+  clusterRoleName: "vlanman-cluster-resource-access"
+  clusterRoleBindingName: "vlanman-role-binding"
+# Service account configuration
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: "vlanman-service-account"
+# Pod configuration
+podAnnotations: {}
+podLabels: {}

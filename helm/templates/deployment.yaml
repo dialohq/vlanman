@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vlanman.fullname" . }}
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "vlanman.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "vlanman.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "vlanman.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "vlanman.serviceAccountName" . }}
+      {{- with .Values.controller.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- with .Values.controller.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: {{ .Values.controller.image }}
+          imagePullPolicy: {{ .Values.controller.pullPolicy }}
+          env:
+            - name: NAMESPACE_NAME
+              value: {{ .Values.global.namespace }}
+            - name: POD_WAIT_TIMEOUT
+              value: "{{ .Values.controller.podTimeoutSeconds }}"
+            - name: MONITORING_ENABLED
+              value: "{{ .Values.global.monitoring.enabled }}"
+            - name: MONITORING_SCRAPE_INTERVAL
+              value: "{{ .Values.global.monitoring.interval }}"
+            - name: MONITORING_RELEASE_NAME
+              value: "{{ .Values.global.monitoring.release}}"
+          volumeMounts:
+          - name: {{ .Values.webhook.volumes.name }}
+            mountPath: {{ .Values.webhook.volumes.mountPath }}
+            readOnly: {{ .Values.webhook.volumes.readOnly }}
+      volumes:
+      - name: {{ .Values.webhook.volumes.name }}
+        secret:
+          secretName: {{ .Values.webhook.certificate.secretName }}
