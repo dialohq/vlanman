@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"dialo.ai/vlanman/internal/controller"
+	errs "dialo.ai/vlanman/pkg/errors"
 	u "dialo.ai/vlanman/pkg/utils"
 	admissionv1 "k8s.io/api/admission/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,7 +67,7 @@ func getAction(req *admissionv1.AdmissionRequest) any {
 func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	in, err := u.ParseRequest(*r)
 	if err != nil {
-		err = fmt.Errorf("Couldn't parse request for validatoin: %w", err)
+		err = errs.NewParsingError("Request", err)
 		writeResponseDenied(w, in, err.Error())
 	}
 	action := getAction(in.Request)
@@ -88,13 +89,15 @@ func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		}
 
 	case deletionAction:
-		message = fmt.Errorf("Unimplemented (delete)")
+		message = &errs.UnimplementedError{Feature: "Deletion"}
 
 	case updateAction:
-		message = fmt.Errorf("Unimplemented (update)")
+		message = &errs.UnimplementedError{Feature: "Update"}
 
 	default:
-		message = fmt.Errorf("Couldn't determine action being taken")
+		message = &errs.InternalError{
+			Context: fmt.Sprintf("Validating webhook couldn't determine action being taken: %s", *in),
+		}
 	}
 
 	if verdict {

@@ -3,7 +3,6 @@ module dialo.ai/vlanman
 go 1.24.3
 
 require (
-	github.com/jrhouston/k8slock v0.2.0
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.83.0
 	k8s.io/api v0.33.1
 	k8s.io/apimachinery v0.33.1
@@ -12,10 +11,16 @@ require (
 )
 
 require (
+	github.com/alecthomas/repr v0.4.0
+	github.com/stretchr/testify v1.10.0
+)
+
+require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
+	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.0 // indirect

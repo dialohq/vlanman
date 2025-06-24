@@ -17,22 +17,17 @@ type Validator struct {
 }
 
 func (v *Validator) validateMinimumNodes(net *vlanmanv1.VlanNetwork) error {
-	fmt.Println("validating minimum", net)
 	names := make([]string, len(v.Nodes))
 	for i, n := range v.Nodes {
-		fmt.Println("adding name", n.Name, i)
 		names[i] = n.Name
 	}
 
-	fmt.Println("names", names)
 	for _, n := range net.Spec.ExcludedNodes {
-		fmt.Println()
 		names = slices.DeleteFunc(names, func(el string) bool {
-			fmt.Println("Checking if should delete", el, n, el == n)
 			return el == n
 		})
 	}
-	fmt.Println("Deleted", names)
+	
 	if len(names) == 0 {
 		return fmt.Errorf("There are no available nodes (make sure you don't exclude all nodes)")
 	}

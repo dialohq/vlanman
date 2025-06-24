@@ -65,20 +65,25 @@
             # go
             pkgs.go
             pkgs.gopls
+            pkgs.nilaway
+            pkgs.golangci-lint
 
-            # kubernetes
+            # lsp
             pkgs.dockerfile-language-server-nodejs
             pkgs.yaml-language-server
             pkgs.yamlfmt
+
+            # kubernetes
             pkgs.kuttl # kubernetes tests
             pkgs.kubernetes-helm
             pkgs.helm-ls
             pkgs.kubernetes-controller-tools
-            pkgs.claude-code
 
             # misc
             pkgs.tokei # loc count
             pkgs.skopeo
+            pkgs.claude-code
+            pkgs.glow
           ];
           shellHook = ''
             go mod tidy

@@ -3,6 +3,8 @@ package v1
 const (
 	// Annotation in pod
 	PodVlanmanNetworkAnnotation = "vlanman.dialo.ai/network"
+	// Label identifying a manager pod
+	ManagerPodLabelKey = "vlanman.dialo.ai/manager"
 	// Prefix for leasing
 	LeasePrefix = "vlanman"
 	// Postfix for leasing

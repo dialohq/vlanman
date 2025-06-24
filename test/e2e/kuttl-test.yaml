@@ -1,0 +1,14 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestSuite
+metadata:
+  name: vlanman-e2e
+spec:
+  startControlPlane: true
+  startKUBE: true
+  manifestDirs:
+    - ../../helm/templates
+  testDirs:
+    - ./tests
+  timeout: 300
+  parallel: 1
+  skipDelete: false
