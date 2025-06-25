@@ -26,6 +26,9 @@ controller:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+manager:
+  image: "192.168.10.201:5000/vlan-manager:latest-dev"
+  pullPolicy: "Always"
 # Webhook configuration
 webhook:
   serviceName: "vlanman-webhook-service"

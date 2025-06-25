@@ -46,6 +46,10 @@ spec:
               value: "{{ .Values.global.monitoring.interval }}"
             - name: MONITORING_RELEASE_NAME
               value: "{{ .Values.global.monitoring.release}}"
+            - name: MANAGER_POD_IMAGE
+              value: "{{ .Values.controller.image }}"
+            - name: MANAGER_PULL_POLICY
+              value: "{{ .Values.controller.pullPolicy }}"
           volumeMounts:
           - name: {{ .Values.webhook.volumes.name }}
             mountPath: {{ .Values.webhook.volumes.mountPath }}

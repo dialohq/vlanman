@@ -52,6 +52,8 @@ func main() {
 		IsMonitoringEnabled:      os.Getenv("MONITORING_ENABLED") == "true",
 		MonitoringScrapeInterval: os.Getenv("MONITORING_SCRAPE_INTERVAL"),
 		MonitoringReleaseName:    os.Getenv("MONITORING_RELEASE_NAME"),
+		VlanManagerImage:         os.Getenv("MANAGER_POD_IMAGE"),
+		VlanManagerPullPolicy:    os.Getenv("MANAGER_PULL_POLICY"),
 		WaitForPodTimeoutSeconds: podTimeout,
 		IsTest:                   false,
 	}

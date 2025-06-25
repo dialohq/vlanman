@@ -89,7 +89,9 @@ func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		}
 
 	case deletionAction:
-		message = &errs.UnimplementedError{Feature: "Deletion"}
+		// message = &errs.UnimplementedError{Feature: "Deletion"}
+		writeResponseNoPatch(w, in)
+		return
 
 	case updateAction:
 		message = &errs.UnimplementedError{Feature: "Update"}
