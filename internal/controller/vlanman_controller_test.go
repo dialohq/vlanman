@@ -225,7 +225,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-1",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net1",
+							vlanmanv1.ManagerSetLabelKey: "net1",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -245,7 +245,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-1",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net1",
+							vlanmanv1.ManagerSetLabelKey: "net1",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -256,7 +256,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-2",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net2",
+							vlanmanv1.ManagerSetLabelKey: "net2",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -276,7 +276,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-1",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net1",
+							vlanmanv1.ManagerSetLabelKey: "net1",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -287,7 +287,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-2",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net1",
+							vlanmanv1.ManagerSetLabelKey: "net1",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -298,7 +298,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-3",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net2",
+							vlanmanv1.ManagerSetLabelKey: "net2",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -319,7 +319,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-1",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net1",
+							vlanmanv1.ManagerSetLabelKey: "net1",
 						},
 					},
 					Spec: corev1.PodSpec{
@@ -341,7 +341,7 @@ func TestVlanmanReconciler_getCurrentState(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "manager-pod-2",
 						Labels: map[string]string{
-							vlanmanv1.ManagerPodLabelKey: "net1",
+							vlanmanv1.ManagerSetLabelKey: "net1",
 						},
 					},
 					Spec: corev1.PodSpec{

@@ -47,9 +47,15 @@ spec:
             - name: MONITORING_RELEASE_NAME
               value: "{{ .Values.global.monitoring.release}}"
             - name: MANAGER_POD_IMAGE
-              value: "{{ .Values.controller.image }}"
+              value: "{{ .Values.manager.image }}"
             - name: MANAGER_PULL_POLICY
-              value: "{{ .Values.controller.pullPolicy }}"
+              value: "{{ .Values.manager.pullPolicy }}"
+            - name: INTERFACE_POD_IMAGE
+              value: "{{ .Values.interface.image }}"
+            - name: INTERFACE_PULL_POLICY
+              value: "{{ .Values.interface.pullPolicy }}"
+            - name: JOB_TTL
+              value: "{{ .Values.interface.jobTTLSeconds }}"
           volumeMounts:
           - name: {{ .Values.webhook.volumes.name }}
             mountPath: {{ .Values.webhook.volumes.mountPath }}

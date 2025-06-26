@@ -4,9 +4,13 @@ const (
 	// Annotation in pod
 	PodVlanmanNetworkAnnotation = "vlanman.dialo.ai/network"
 	// Label identifying a manager pod
-	ManagerPodLabelKey = "vlanman.dialo.ai/manager"
+	ManagerSetLabelKey = "vlanman.dialo.ai/manager"
 	// Manager pod name prefix
-	ManagerPodNamePrefix = "vlan-manager"
+	ManagerSetNamePrefix = "vlan-manager"
+	// Wait for daemon timeout
+	WaitForDaemonTimeout = 30
+	// Job name prefix
+	JobNamePrefix = "create-vlan-job"
 	// Manager container name
 	ManagerContainerName = "vlan-manager"
 	// NodeSelector host name label

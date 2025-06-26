@@ -3,12 +3,12 @@ package controller
 import (
 	"context"
 	"fmt"
-	"maps"
 	"reflect"
 	"slices"
 	"strings"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +35,9 @@ type Envs struct {
 	IsMonitoringEnabled      bool
 	MonitoringScrapeInterval string
 	MonitoringReleaseName    string
+	TTL                      *int32
+	InterfacePodImage        string
+	InterfacePodPullPolicy   string
 }
 
 type VlanmanReconciler struct {
@@ -57,141 +60,90 @@ func (e *ReconcileError) Unwrap() error {
 }
 
 type ReconcileErrorList struct {
-	Errs []ReconcileError
+	Errs []*ReconcileError
 }
 
 func (e *ReconcileErrorList) Error() string {
-	msg := fmt.Sprintf("%d errors occured while reconciling: ", len(e.Errs))
-	formatted := []string{}
-	for idx, err := range e.Errs {
-		formatted = append(formatted, fmt.Sprintf("%d -> %s, ", idx, err.Error()))
+	errStr := []string{}
+	msg := fmt.Sprintf("%d Unrecoverable errors encountered: ", len(e.Errs))
+	for _, e := range e.Errs {
+		errStr = append(errStr, (*e).Error())
 	}
-	return msg + strings.Join(formatted, ", ")
+	msg += strings.Join(errStr, " |+| ")
+	return msg
 }
 
 func (r *VlanmanReconciler) ReconcilePod(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	return ctrl.Result{}, &errs.UnimplementedError{Feature: "Pod reconciliation"}
 }
 
-func (r *VlanmanReconciler) getCurrentState(ctx context.Context) (*ClusterState, error) {
+func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, error) {
+	managers := appsv1.DaemonSetList{}
 	selector := labels.NewSelector()
-	requirement, err := labels.NewRequirement(vlanmanv1.ManagerPodLabelKey, "exists", nil)
+	requirement, err := labels.NewRequirement(vlanmanv1.ManagerSetLabelKey, "exists", nil)
 	if err != nil {
 		return nil, &errs.InternalError{Context: fmt.Sprintf("Error creating a label selector requirement in createDesiredState: %s", err.Error())}
 	}
 	selector = selector.Add(*requirement)
-
 	opts := client.ListOptions{
 		LabelSelector: selector,
 	}
-	managerList := &corev1.PodList{}
-	err = r.Client.List(ctx, managerList, &opts)
+	err = r.Client.List(ctx, &managers, &opts)
 	if err != nil {
 		return nil, &errs.ClientRequestError{
 			Location: "getCurrentState",
-			Action:   "List Pods with Field Selector",
+			Action:   "List pods with field selector",
 			Err:      err,
 		}
 	}
-	state := &ClusterState{Nodes: map[string]Node{}}
-	for _, manager := range managerList.Items {
-		nodeName := manager.Spec.NodeName
-		node, ok := state.Nodes[nodeName]
-		if !ok {
-			node = Node{Managers: map[string]ManagerPod{}}
-		}
-
-		nwName, ok := manager.Labels[vlanmanv1.ManagerPodLabelKey]
-		if !ok {
-			return nil, &errs.InternalError{Context: "In getCurrentState, pod has no label"}
-		}
-		mgr := managerFromPod(manager)
-		node.Managers[nwName] = mgr
-		state.Nodes[nodeName] = node
+	// TODO: check if interfaces are created
+	mgrs := []ManagerSet{}
+	for _, m := range managers.Items {
+		mgrs = append(mgrs, managerFromSet(m))
 	}
-	return state, nil
+	return mgrs, nil
 }
 
-func (r *VlanmanReconciler) createDesiredState(ctx context.Context, networks []vlanmanv1.VlanNetwork) (*ClusterState, error) {
-	nodeList := &corev1.NodeList{}
-	err := r.Client.List(ctx, nodeList)
-	if err != nil {
-		return nil, &errs.ClientRequestError{
-			Location: "createDesiredState",
-			Action:   "List Nodes",
-			Err:      err,
-		}
+func (r *VlanmanReconciler) createDesiredState(ctx context.Context, networks []vlanmanv1.VlanNetwork) []ManagerSet {
+	mgrs := []ManagerSet{}
+	for _, net := range networks {
+		mgrs = append(mgrs, ManagerSet{
+			OwnerNetworkName: net.Name,
+			VlanID:           int64(net.Spec.VlanID),
+			ExcludedNodes:    net.Spec.ExcludedNodes,
+		})
 	}
-	state := &ClusterState{Nodes: map[string]Node{}}
-	for _, node := range nodeList.Items {
-		nodeState, ok := state.Nodes[node.Name]
-		if !ok {
-			nodeState = Node{Managers: map[string]ManagerPod{}}
-		}
-		for _, nw := range networks {
-			if slices.Contains(nw.Spec.ExcludedNodes, node.Name) {
-				continue
-			}
-			nodeState.Managers[nw.Name] = createDesiredManager(nw, node.Name)
-		}
-		state.Nodes[node.Name] = nodeState
-	}
-	return state, nil
+	return mgrs
 }
 
-func (r *VlanmanReconciler) diffManagers(desired, current *ManagerPod) []Action {
+func (r *VlanmanReconciler) diffManagers(desired, current ManagerSet) []Action {
 	if reflect.DeepEqual(desired, current) {
 		return []Action{}
 	}
-
-	if desired != nil && current == nil {
-		return []Action{&CreateManagerAction{Manager: *desired}}
-	}
-
-	if desired != nil && current != nil {
-		return []Action{&ThrowErrorAction{
-			Err: &errs.InternalError{
-				Context: fmt.Sprintf("in diffManagers, both are not nil but aren't equal. Currently there is no valid case in which this happens: %+v, %+v", desired, current),
-			},
-		}}
-	}
-	return []Action{&ThrowErrorAction{
-		Err: &errs.InternalError{
-			Context: fmt.Sprintf("In diffManagers got to the end of function, this shouldn't happen. Should always exit before: %+v, %+v", desired, current),
-		},
-	}}
+	return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
 }
 
-func (r *VlanmanReconciler) diffNodes(desired, current Node) []Action {
+func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet) []Action {
 	acts := []Action{}
-	if reflect.DeepEqual(desired, current) {
-		return acts
-	}
 
-	for nwName, desiredMgr := range desired.Managers {
-		currentMgr, ok := current.Managers[nwName]
-		if !ok {
-			acts = append(acts, r.diffManagers(&desiredMgr, nil)...)
-		} else {
-			acts = append(acts, r.diffManagers(&desiredMgr, &currentMgr)...)
+	// sort for searching
+	slices.SortFunc(desired, managerCmp)
+	slices.SortFunc(current, managerCmp)
+
+	for _, desiredMgr := range desired {
+		idx, found := slices.BinarySearchFunc(current, desiredMgr, managerCmp)
+		if !found {
+			acts = append(acts, &CreateManagerAction{Manager: desiredMgr})
+			continue
 		}
+		acts = append(acts, r.diffManagers(desiredMgr, current[idx])...)
 	}
 
-	desiredAll := slices.Collect(maps.Keys(desired.Managers))
-	currentAll := slices.Collect(maps.Keys(current.Managers))
-	for _, c := range currentAll {
-		if !slices.Contains(desiredAll, c) {
-			acts = append(acts, &DeleteManagerAction{Manager: current.Managers[c]})
+	for _, currentMgr := range current {
+		_, found := slices.BinarySearchFunc(desired, currentMgr, managerCmp)
+		if !found {
+			acts = append(acts, &DeleteManagerAction{Manager: currentMgr})
 		}
-	}
-	return acts
-}
-
-func (r *VlanmanReconciler) diffStates(desired, current *ClusterState) []Action {
-	acts := []Action{}
-	for nodeName, desiredState := range desired.Nodes {
-		currentState := current.Nodes[nodeName]
-		acts = append(acts, r.diffNodes(desiredState, currentState)...)
 	}
 	return acts
 }
@@ -209,7 +161,7 @@ func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.
 		}
 	}
 
-	desired, err := r.createDesiredState(ctx, networkList.Items)
+	desired := r.createDesiredState(ctx, networkList.Items)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -238,7 +190,9 @@ func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.
 	}
 
 	if len(errList) != 0 {
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, &ReconcileErrorList{
+			Errs: errList,
+		}
 	}
 
 	return ctrl.Result{}, nil

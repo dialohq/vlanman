@@ -14,7 +14,7 @@ func TestManagerFromPod(t *testing.T) {
 	tests := []struct {
 		name        string
 		pod         corev1.Pod
-		expectedPod ManagerPod
+		expectedPod ManagerSet
 	}{
 		{
 			name: "basic pod conversion",
@@ -23,14 +23,14 @@ func TestManagerFromPod(t *testing.T) {
 					Name:      "test-manager-pod",
 					Namespace: "default",
 					Labels: map[string]string{
-						vlanmanv1.ManagerPodLabelKey: "net1",
+						vlanmanv1.ManagerSetLabelKey: "net1",
 					},
 				},
 				Spec: corev1.PodSpec{
 					NodeName: "node1",
 				},
 			},
-			expectedPod: ManagerPod{
+			expectedPod: ManagerSet{
 				Exists:           true,
 				OwnerNetworkName: "net1",
 				NodeName:         "node1",
@@ -43,7 +43,7 @@ func TestManagerFromPod(t *testing.T) {
 					Name:      "complex-manager-pod",
 					Namespace: "kube-system",
 					Labels: map[string]string{
-						vlanmanv1.ManagerPodLabelKey: "net2",
+						vlanmanv1.ManagerSetLabelKey: "net2",
 						"app":                        "vlanman",
 						"version":                    "v1.0.0",
 					},
@@ -61,7 +61,7 @@ func TestManagerFromPod(t *testing.T) {
 					},
 				},
 			},
-			expectedPod: ManagerPod{
+			expectedPod: ManagerSet{
 				Exists:           true,
 				OwnerNetworkName: "net2",
 				NodeName:         "worker-node-1",
@@ -71,7 +71,7 @@ func TestManagerFromPod(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := managerFromPod(tt.pod)
+			result := managerFromSet(tt.pod)
 			assert.Equal(t, tt.expectedPod, result)
 		})
 	}
@@ -81,7 +81,7 @@ func TestCreateDesiredManager(t *testing.T) {
 	tests := []struct {
 		name            string
 		network         vlanmanv1.VlanNetwork
-		expectedManager ManagerPod
+		expectedManager ManagerSet
 		node            string
 	}{
 		{
@@ -99,7 +99,7 @@ func TestCreateDesiredManager(t *testing.T) {
 				},
 			},
 			node: "test-node",
-			expectedManager: ManagerPod{
+			expectedManager: ManagerSet{
 				OwnerNetworkName: "test-network",
 				Exists:           true,
 				NodeName:         "test-node",
@@ -121,7 +121,7 @@ func TestCreateDesiredManager(t *testing.T) {
 				},
 			},
 			node: "test-node",
-			expectedManager: ManagerPod{
+			expectedManager: ManagerSet{
 				Exists:           true,
 				OwnerNetworkName: "complex-network",
 				NodeName:         "test-node",
@@ -138,7 +138,7 @@ func TestCreateDesiredManager(t *testing.T) {
 				},
 			},
 			node: "test-node",
-			expectedManager: ManagerPod{
+			expectedManager: ManagerSet{
 				Exists:           true,
 				OwnerNetworkName: "minimal-network",
 				NodeName:         "test-node",
@@ -159,7 +159,7 @@ func TestCreateDesiredManager(t *testing.T) {
 				},
 			},
 			node: "test-node",
-			expectedManager: ManagerPod{
+			expectedManager: ManagerSet{
 				Exists:           true,
 				OwnerNetworkName: "zero-vlan-network",
 				NodeName:         "test-node",
@@ -169,7 +169,7 @@ func TestCreateDesiredManager(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := createDesiredManager(tt.network, tt.node)
+			result := createDesiredManagerSet(tt.network, tt.node)
 			assert.Equal(t, tt.expectedManager, result)
 		})
 	}

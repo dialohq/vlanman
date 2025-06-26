@@ -47,6 +47,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	ttlEnv, err := strconv.ParseInt(os.Getenv("JOB_TTL"), 10, 32)
+	var ttl *int32
+	if err != nil {
+		ttl = nil
+	} else {
+		bit32 := int32(ttlEnv)
+		ttl = &bit32
+	}
+
 	e := controller.Envs{
 		NamespaceName:            os.Getenv("NAMESPACE_NAME"),
 		IsMonitoringEnabled:      os.Getenv("MONITORING_ENABLED") == "true",
@@ -54,11 +63,19 @@ func main() {
 		MonitoringReleaseName:    os.Getenv("MONITORING_RELEASE_NAME"),
 		VlanManagerImage:         os.Getenv("MANAGER_POD_IMAGE"),
 		VlanManagerPullPolicy:    os.Getenv("MANAGER_PULL_POLICY"),
+		InterfacePodImage:        os.Getenv("INTERFACE_POD_IMAGE"),
+		InterfacePodPullPolicy:   os.Getenv("INTERFACE_PULL_POLICY"),
 		WaitForPodTimeoutSeconds: podTimeout,
+		TTL:                      ttl,
 		IsTest:                   false,
 	}
 	if e.IsMonitoringEnabled {
 		logger.Info("Enabling monitoring", "release", e.MonitoringReleaseName)
+	}
+
+	if err != nil {
+		logger.Error(err, "Couldn't get informer for a daemonset lister")
+		os.Exit(1)
 	}
 
 	logger.Info("Creating controller")

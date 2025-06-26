@@ -5,5 +5,5 @@ type ClusterState struct {
 }
 
 type Node struct {
-	Managers map[string]ManagerPod // per network name
+	Managers map[string]ManagerSet // per network name
 }
