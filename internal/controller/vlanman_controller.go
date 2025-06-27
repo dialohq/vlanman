@@ -11,7 +11,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	errs "dialo.ai/vlanman/pkg/errors"
@@ -42,7 +42,7 @@ type Envs struct {
 
 type VlanmanReconciler struct {
 	Client client.Client
-	Scheme *runtime.Scheme
+	Scheme *k8sRuntime.Scheme
 	Env    Envs
 }
 
@@ -91,9 +91,8 @@ func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, 
 	err = r.Client.List(ctx, &managers, &opts)
 	if err != nil {
 		return nil, &errs.ClientRequestError{
-			Location: "getCurrentState",
-			Action:   "List pods with field selector",
-			Err:      err,
+			Action: "List pods with field selector",
+			Err:    err,
 		}
 	}
 	// TODO: check if interfaces are created
@@ -171,9 +170,8 @@ func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.
 	err := r.Client.List(ctx, networkList)
 	if err != nil {
 		return ctrl.Result{}, &errs.ClientRequestError{
-			Location: "ReconcileNetwork",
-			Action:   "List VlanNetworks",
-			Err:      err,
+			Action: "List VlanNetworks",
+			Err:    err,
 		}
 	}
 

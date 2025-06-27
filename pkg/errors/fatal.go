@@ -5,17 +5,18 @@ import (
 	"fmt"
 )
 
-var ErrFatalUnrecoverable = errors.New("Fatal unrecoverable error")
+var ErrUnrecoverable = errors.New("Fatal unrecoverable error")
+var ErrNilUnrecoverable = errors.New("value required to progress is nil")
 
-type FatalUnrecoverableError struct {
+type UnrecoverableError struct {
 	Context string
 	Err     error
 }
 
-func (e *FatalUnrecoverableError) Error() string {
-	return fmt.Sprintf("Fatal unrecoverable error occured. Context: %s, error: %s", e.Context, e.Err.Error())
+func (e *UnrecoverableError) Error() string {
+	return fmt.Sprintf("Fatal unrecoverable error occured in %s. Context: %s, error: %s", GetCallerInfo(), e.Context, e.Err.Error())
 }
 
-func (e *FatalUnrecoverableError) Unwrap() error {
+func (e *UnrecoverableError) Unwrap() error {
 	return e.Err
 }

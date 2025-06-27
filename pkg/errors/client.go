@@ -8,13 +8,12 @@ import (
 var ErrK8sClient = errors.New("K8s client request error")
 
 type ClientRequestError struct {
-	Location string
-	Action   string
-	Err      error
+	Action string
+	Err    error
 }
 
 func (e *ClientRequestError) Error() string {
-	return fmt.Sprintf("Error requesting %s in %s via k8s client: %s", e.Action, e.Location, e.Err.Error())
+	return fmt.Sprintf("Error requesting %s in %s via k8s client: %s", e.Action, GetCallerInfo(), e.Err.Error())
 }
 
 func (e *ClientRequestError) Unwrap() error {
@@ -23,20 +22,18 @@ func (e *ClientRequestError) Unwrap() error {
 
 func NewClientRequestError(loc, act string, err error) error {
 	return fmt.Errorf("%w: %w", ErrK8sClient, &ClientRequestError{
-		Location: loc,
-		Action:   act,
-		Err:      err,
+		Action: act,
+		Err:    err,
 	})
 }
 
 type RequestError struct {
-	Location string
-	Action   string
-	Err      error
+	Action string
+	Err    error
 }
 
 func (e *RequestError) Error() string {
-	return fmt.Sprintf("Error requesting %s in %s via http client: %s", e.Action, e.Location, e.Err.Error())
+	return fmt.Sprintf("Error requesting %s in %s via http client: %s", e.Action, GetCallerInfo(), e.Err.Error())
 }
 
 func (e *RequestError) Unwrap() error {

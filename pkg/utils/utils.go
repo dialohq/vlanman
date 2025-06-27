@@ -2,13 +2,15 @@ package utils
 
 import (
 	"bytes"
-	errs "dialo.ai/vlanman/pkg/errors"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"regexp"
+	"runtime"
+
+	errs "dialo.ai/vlanman/pkg/errors"
 
 	admissionv1 "k8s.io/api/admission/v1"
 )
@@ -36,9 +38,9 @@ func ParseRequest(r http.Request) (*admissionv1.AdmissionReview, error) {
 	}
 
 	if r.Body == nil {
-		return nil, &errs.FatalUnrecoverableError{
+		return nil, &errs.UnrecoverableError{
 			Context: "While unmarshaling admission request in ParseRequest, request.Body is nil",
-			Err:     errs.ErrFatalUnrecoverable,
+			Err:     errs.ErrUnrecoverable,
 		}
 	}
 	bodybuf := new(bytes.Buffer)
@@ -59,4 +61,48 @@ func ParseRequest(r http.Request) (*admissionv1.AdmissionReview, error) {
 	}
 
 	return &a, nil
+}
+
+type CallerInfo struct {
+	FunctionName string
+	File         string
+	Line         int
+	Err          error
+}
+
+func (ci CallerInfo) String() string {
+	if ci.Err != nil {
+		return fmt.Sprintf("Error extracting location information: %s", ci.Err.Error())
+	}
+	return fmt.Sprintf("%s in file %s at line %d", ci.FunctionName, ci.File, ci.Line)
+}
+
+func GetCallerInfo() CallerInfo {
+	pcs := make([]uintptr, 1)
+	n := runtime.Callers(2, pcs)
+	if n != 1 {
+		return CallerInfo{
+			Err: &errs.UnrecoverableError{
+				Context: "Couldn't get runtime.callers for logging, returned 0",
+				Err:     errs.ErrNilUnrecoverable,
+			},
+		}
+	}
+	framesPtr := runtime.CallersFrames(pcs)
+	if framesPtr == nil {
+		return CallerInfo{
+			Err: &errs.UnrecoverableError{
+				Context: "Frames pointer returned from CallersFrames is nil",
+				Err:     errs.ErrNilUnrecoverable,
+			},
+		}
+	}
+
+	frame, _ := framesPtr.Next()
+	return CallerInfo{
+		FunctionName: frame.Function,
+		Line:         frame.Line,
+		File:         frame.File,
+		Err:          nil,
+	}
 }

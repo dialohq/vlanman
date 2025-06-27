@@ -92,9 +92,8 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 	err := r.Client.Create(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
-			Location: "CreateManagerAction",
-			Action:   "Create daemonset",
-			Err:      err,
+			Action: "Create daemonset",
+			Err:    err,
 		}
 	}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: daemonSet.Name, Namespace: daemonSet.Namespace}, &daemonSet)
@@ -141,9 +140,8 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				return &errs.ClientRequestError{
-					Location: "CreateManagerAction/waitForDaemonSet",
-					Action:   "Get Daemonset",
-					Err:      err,
+					Action: "Get Daemonset",
+					Err:    err,
 				}
 			}
 		}
@@ -196,9 +194,8 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			err := r.Client.Get(ctx, types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, &pod)
 			if err != nil {
 				return &errs.ClientRequestError{
-					Location: "CreateManagerAction",
-					Action:   "Wait for pod",
-					Err:      err,
+					Action: "Wait for pod",
+					Err:    err,
 				}
 			}
 			tries += 1
@@ -214,17 +211,15 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		resp, err := http.Get(fmt.Sprintf("http://%s:61410/pid", pod.Status.PodIP))
 		if err != nil {
 			return &errs.RequestError{
-				Location: "CreateManagerAction/CreateJob",
-				Action:   "Get PID",
-				Err:      err,
+				Action: "Get PID",
+				Err:    err,
 			}
 		}
 
 		if resp == nil || resp.Body == nil {
 			return &errs.RequestError{
-				Location: "CreateManagerAction/CreateJob",
-				Action:   "Get PID",
-				Err:      fmt.Errorf("response or response body is nil"),
+				Action: "Get PID",
+				Err:    fmt.Errorf("response or response body is nil"),
 			}
 		}
 
@@ -250,24 +245,21 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		if err != nil {
 			// TODO: there should be cleanup here as well
 			return &errs.ClientRequestError{
-				Location: "CreateManagerAction",
-				Action:   "Create job",
-				Err:      err,
+				Action: "Create job",
+				Err:    err,
 			}
 		}
 		resp, err = http.Get(fmt.Sprintf("http://%s:61410", pod.Status.PodIP))
 		if err != nil {
 			return &errs.RequestError{
-				Location: "CreateManagerAction",
-				Action:   "CheckDaemonReady",
-				Err:      err,
+				Action: "CheckDaemonReady",
+				Err:    err,
 			}
 		}
 		if resp == nil {
 			return &errs.RequestError{
-				Location: "CreateManagerAction",
-				Action:   "CheckDaemonReady",
-				Err:      fmt.Errorf("Response is nil"),
+				Action: "CheckDaemonReady",
+				Err:    fmt.Errorf("Response is nil"),
 			}
 		}
 		for resp.StatusCode != 200 && timeout <= vlanmanv1.WaitForDaemonTimeout {
@@ -276,9 +268,8 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			resp, err = http.Get(fmt.Sprintf("http://%s:61410/ready", pod.Status.PodIP))
 			if err != nil {
 				return &errs.RequestError{
-					Location: "CreateManagerAction",
-					Action:   "CheckDaemonReady",
-					Err:      err,
+					Action: "CheckDaemonReady",
+					Err:    err,
 				}
 			}
 			time.Sleep(time.Second / 2)
@@ -298,9 +289,8 @@ func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 	err := r.Client.Delete(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
-			Location: "DeleteManagerAction",
-			Action:   "Delete daemonset",
-			Err:      err,
+			Action: "Delete daemonset",
+			Err:    err,
 		}
 	}
 	return nil

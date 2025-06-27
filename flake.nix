@@ -67,6 +67,7 @@
             pkgs.gopls
             pkgs.nilaway
             pkgs.golangci-lint
+            pkgs.golangci-lint-langserver
 
             # lsp
             pkgs.dockerfile-language-server-nodejs
