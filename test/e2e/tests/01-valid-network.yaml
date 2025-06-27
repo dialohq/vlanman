@@ -1,12 +1,10 @@
 apiVersion: vlanman.dialo.ai/v1
 kind: VlanNetwork
 metadata:
-  name: test-valid-network
-  namespace: vlanman-test
+  name: net1
 spec:
   vlanId: 100
   gatewayIp: "192.168.100.1"
   localSubnet: "192.168.100.0/24"
   remoteSubnet: "192.168.200.0/24"
-status:
-  active: false
+  excludedNodes: []

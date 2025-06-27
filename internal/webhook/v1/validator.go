@@ -2,12 +2,14 @@ package v1
 
 import (
 	"context"
-	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"encoding/json"
 	"fmt"
+	"slices"
+
+	vlanmanv1 "dialo.ai/vlanman/api/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"slices"
 )
 
 type Validator struct {
@@ -27,7 +29,7 @@ func (v *Validator) validateMinimumNodes(net *vlanmanv1.VlanNetwork) error {
 			return el == n
 		})
 	}
-	
+
 	if len(names) == 0 {
 		return fmt.Errorf("There are no available nodes (make sure you don't exclude all nodes)")
 	}

@@ -4,85 +4,84 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
 )
 
-func TestManagerFromPod(t *testing.T) {
+func TestManagerFromDaemonSet(t *testing.T) {
 	tests := []struct {
 		name        string
-		pod         corev1.Pod
-		expectedPod ManagerSet
+		daemonSet   appsv1.DaemonSet
+		expectedMgr ManagerSet
 	}{
 		{
-			name: "basic pod conversion",
-			pod: corev1.Pod{
+			name: "basic daemonset conversion",
+			daemonSet: appsv1.DaemonSet{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-manager-pod",
+					Name:      "manager-net1",
 					Namespace: "default",
 					Labels: map[string]string{
 						vlanmanv1.ManagerSetLabelKey: "net1",
 					},
 				},
-				Spec: corev1.PodSpec{
-					NodeName: "node1",
-				},
-			},
-			expectedPod: ManagerSet{
-				Exists:           true,
-				OwnerNetworkName: "net1",
-				NodeName:         "node1",
-			},
-		},
-		{
-			name: "pod with additional labels",
-			pod: corev1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "complex-manager-pod",
-					Namespace: "kube-system",
-					Labels: map[string]string{
-						vlanmanv1.ManagerSetLabelKey: "net2",
-						"app":                        "vlanman",
-						"version":                    "v1.0.0",
-					},
-					Annotations: map[string]string{
-						"description": "VLAN manager pod",
-					},
-				},
-				Spec: corev1.PodSpec{
-					NodeName: "worker-node-1",
-					Containers: []corev1.Container{
-						{
-							Name:  "manager",
-							Image: "vlanman:latest",
+				Spec: appsv1.DaemonSetSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Env: []corev1.EnvVar{
+										{
+											Name:  "VLAN_ID",
+											Value: "100",
+										},
+									},
+								},
+							},
+							Affinity: &corev1.Affinity{
+								NodeAffinity: &corev1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
+											{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
+													{
+														Key:      "kubernetes.io/hostname",
+														Operator: corev1.NodeSelectorOpNotIn,
+														Values:   []string{"excluded-node"},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
 						},
 					},
 				},
 			},
-			expectedPod: ManagerSet{
-				Exists:           true,
-				OwnerNetworkName: "net2",
-				NodeName:         "worker-node-1",
+			expectedMgr: ManagerSet{
+				OwnerNetworkName: "net1",
+				VlanID:           100,
+				ExcludedNodes:    []string{"excluded-node"},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := managerFromSet(tt.pod)
-			assert.Equal(t, tt.expectedPod, result)
+			result := managerFromSet(tt.daemonSet)
+			assert.Equal(t, tt.expectedMgr, result)
 		})
 	}
 }
 
-func TestCreateDesiredManager(t *testing.T) {
+func TestCreateDesiredManagerSet(t *testing.T) {
 	tests := []struct {
 		name            string
 		network         vlanmanv1.VlanNetwork
 		expectedManager ManagerSet
-		node            string
 	}{
 		{
 			name: "basic network",
@@ -98,11 +97,10 @@ func TestCreateDesiredManager(t *testing.T) {
 					RemoteSubnet: "192.168.2.0/24",
 				},
 			},
-			node: "test-node",
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "test-network",
-				Exists:           true,
-				NodeName:         "test-node",
+				VlanID:           100,
+				ExcludedNodes:    nil,
 			},
 		},
 		{
@@ -120,11 +118,10 @@ func TestCreateDesiredManager(t *testing.T) {
 					ExcludedNodes: []string{"node1", "node2"},
 				},
 			},
-			node: "test-node",
 			expectedManager: ManagerSet{
-				Exists:           true,
 				OwnerNetworkName: "complex-network",
-				NodeName:         "test-node",
+				VlanID:           200,
+				ExcludedNodes:    []string{"node1", "node2"},
 			},
 		},
 		{
@@ -137,15 +134,14 @@ func TestCreateDesiredManager(t *testing.T) {
 					VlanID: 42,
 				},
 			},
-			node: "test-node",
 			expectedManager: ManagerSet{
-				Exists:           true,
 				OwnerNetworkName: "minimal-network",
-				NodeName:         "test-node",
+				VlanID:           42,
+				ExcludedNodes:    nil,
 			},
 		},
 		{
-			name: "network with zero VLAN ID",
+			name: "zero VLAN ID network",
 			network: vlanmanv1.VlanNetwork{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "zero-vlan-network",
@@ -158,18 +154,17 @@ func TestCreateDesiredManager(t *testing.T) {
 					ExcludedNodes: []string{},
 				},
 			},
-			node: "test-node",
 			expectedManager: ManagerSet{
-				Exists:           true,
 				OwnerNetworkName: "zero-vlan-network",
-				NodeName:         "test-node",
+				VlanID:           0,
+				ExcludedNodes:    []string{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := createDesiredManagerSet(tt.network, tt.node)
+			result := createDesiredManagerSet(tt.network)
 			assert.Equal(t, tt.expectedManager, result)
 		})
 	}

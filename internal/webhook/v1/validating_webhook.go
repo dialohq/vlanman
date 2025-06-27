@@ -21,10 +21,12 @@ type ValidatingWebhookHandler struct {
 }
 
 // actionTypes
-type creationAction struct{}
-type deletionAction struct{}
-type updateAction struct{}
-type unknownAction struct{}
+type (
+	creationAction struct{}
+	deletionAction struct{}
+	updateAction   struct{}
+	unknownAction  struct{}
+)
 
 func writeResponseNoPatch(w http.ResponseWriter, in *admissionv1.AdmissionReview) {
 	w.Header().Add("Content-Type", "application/json")
@@ -121,8 +123,8 @@ func noPatchResponse(in *admissionv1.AdmissionReview) *admissionv1.AdmissionRevi
 			Allowed: true,
 		},
 	}
-
 }
+
 func deniedResponse(in *admissionv1.AdmissionReview, reasonList ...string) *admissionv1.AdmissionReview {
 	reason := "No reason provided."
 	if len(reasonList) != 0 {
@@ -142,5 +144,4 @@ func deniedResponse(in *admissionv1.AdmissionReview, reasonList ...string) *admi
 			},
 		},
 	}
-
 }

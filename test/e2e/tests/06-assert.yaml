@@ -1,0 +1,52 @@
+# Verify net3 and net4 still exist (should not be deleted)
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net3
+spec:
+  excludedNodes: ["nixos"]
+  gatewayIp: "192.168.100.3"
+  localSubnet: "192.168.300.0/24"
+  remoteSubnet: "192.168.400.0/24"
+  vlanId: 300
+---
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net4
+spec:
+  excludedNodes: ["nixos2"]
+  gatewayIp: "192.168.100.4"
+  localSubnet: "192.168.400.0/24"
+  remoteSubnet: "192.168.500.0/24"
+  vlanId: 400
+---
+# Verify net3 and net4 DaemonSets still exist
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan-manager-net3
+  namespace: vlanman-system
+  labels:
+    vlanman.dialo.ai/manager: net3
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan-manager-net4
+  namespace: vlanman-system
+  labels:
+    vlanman.dialo.ai/manager: net4
+---
+# Verify net3 and net4 Jobs still exist
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-vlan-job-net3-nixos2
+  namespace: vlanman-system
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: create-vlan-job-net4-nixos
+  namespace: vlanman-system

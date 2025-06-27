@@ -32,7 +32,7 @@ manager:
 interface:
   image: "192.168.10.201:5000/vlan-interface:latest-dev"
   pullPolicy: "Always"
-  jobTTLSeconds: 120 # negative values mean never
+  jobTTLSeconds: 15 # negative values mean never
 # Webhook configuration
 webhook:
   serviceName: "vlanman-webhook-service"

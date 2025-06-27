@@ -2,13 +2,15 @@ package utils
 
 import (
 	"bytes"
+	errs "dialo.ai/vlanman/pkg/errors"
 	"encoding/json"
 	"fmt"
-	admissionv1 "k8s.io/api/admission/v1"
 	"log/slog"
 	"net/http"
 	"os"
 	"regexp"
+
+	admissionv1 "k8s.io/api/admission/v1"
 )
 
 func Fatal(err error, l *slog.Logger, message string, args ...any) {
@@ -19,18 +21,26 @@ func Fatal(err error, l *slog.Logger, message string, args ...any) {
 }
 
 // https://ihateregex.io/expr/ip/
+// IsValidIPv4 checks wheter a given IP address string is a valid IPv4 address
 func IsValidIPv4(ip string) bool {
-	var regex = regexp.MustCompile(`(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
+	regex := regexp.MustCompile(`(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}`)
 	return regex.MatchString(ip)
 }
 
 // https://github.com/slackhq/simple-kubernetes-webhook/blob/main/main.go
+// ParseRequest parses the admission request into a go struct
 func ParseRequest(r http.Request) (*admissionv1.AdmissionReview, error) {
 	if r.Header.Get("Content-Type") != "application/json" {
 		return nil, fmt.Errorf("Content-Type: %q should be %q",
 			r.Header.Get("Content-Type"), "application/json")
 	}
 
+	if r.Body == nil {
+		return nil, &errs.FatalUnrecoverableError{
+			Context: "While unmarshaling admission request in ParseRequest, request.Body is nil",
+			Err:     errs.ErrFatalUnrecoverable,
+		}
+	}
 	bodybuf := new(bytes.Buffer)
 	bodybuf.ReadFrom(r.Body)
 	body := bodybuf.Bytes()

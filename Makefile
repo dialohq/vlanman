@@ -33,9 +33,11 @@ interface:
 all: vlanman manager interface
 
 unit-test:
-	go test ./... -v
+	go test ./internal/controller ./internal/webhook/v1 -race -count 100 
 
 e2e-test:
 	kubectl kuttl test ./test/e2e/
+linters:
+	nilaway -include-pkgs="dialo.ai/vlanman" ./...
 
 test-all: unit-test e2e-test

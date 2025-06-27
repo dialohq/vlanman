@@ -97,16 +97,24 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 				},
 			},
 		}
-
 	}
 	return spec
 }
 
 func managerFromSet(d appsv1.DaemonSet) ManagerSet {
 	excludedNodes := []string{}
-	for _, t := range d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-		excludedNodes = append(excludedNodes, t.MatchExpressions[0].Values...)
+	if d.Spec.Template.Spec.Affinity != nil &&
+		d.Spec.Template.Spec.Affinity.NodeAffinity != nil &&
+		d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil &&
+		d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms != nil {
+
+		for _, t := range d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+			if len(t.MatchExpressions) != 0 {
+				excludedNodes = append(excludedNodes, t.MatchExpressions[0].Values...)
+			}
+		}
 	}
+
 	val, _ := strconv.ParseInt(d.Spec.Template.Spec.Containers[0].Env[0].Value, 10, 64)
 	return ManagerSet{
 		OwnerNetworkName: d.Labels[vlanmanv1.ManagerSetLabelKey],

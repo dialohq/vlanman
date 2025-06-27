@@ -1,5 +1,31 @@
 version: "2"
+
+formatters:
+  enable:
+    - gofumpt
+    
+
 linters:
-  default: all
-  disable:
-    - depguard
+  # We'll track the golangci-lint default linters manually
+  # instead of letting them change without our control.
+  default: none
+  enable:
+    # golangci-lint defaults:
+    - errcheck
+    # - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+    # Our own extras:
+    - nolintlint # lints nolint directives
+    - revive
+  settings:
+      govet:
+        # These govet checks are disabled by default, but they're useful.
+        enable:
+          - nilness
+          - reflectvaluecompare
+          - sortslice
+          - unusedwrite

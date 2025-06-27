@@ -13,16 +13,16 @@ import (
 func findDefaultInterface() (*ip.Link, error) {
 	_, dflt, err := net.ParseCIDR("0.0.0.0/0")
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing CIDR: %s", err.Error())
+		return nil, fmt.Errorf("error parsing CIDR: %s", err.Error())
 	}
 	links, err := ip.LinkList()
 	if err != nil {
-		return nil, fmt.Errorf("Error listing links: %s", err.Error())
+		return nil, fmt.Errorf("error listing links: %s", err.Error())
 	}
 	for _, l := range links {
 		routes, err := ip.RouteList(l, ip.FAMILY_V4)
 		if err != nil {
-			return nil, fmt.Errorf("Error listing routes for device %s: %s", l.Attrs().Name, err.Error())
+			return nil, fmt.Errorf("error listing routes for device %s: %s", l.Attrs().Name, err.Error())
 		}
 		if len(routes) == 0 {
 			continue

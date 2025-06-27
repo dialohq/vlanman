@@ -65,7 +65,7 @@ func TestValidator_validateMinimumNodes(t *testing.T) {
 			errorContains: "There are no available nodes",
 		},
 		{
-			name: "invalid - no nodes at all",
+			name:  "invalid - no nodes at all",
 			nodes: []corev1.Node{},
 			network: &vlanmanv1.VlanNetwork{
 				Spec: vlanmanv1.VlanNetworkSpec{

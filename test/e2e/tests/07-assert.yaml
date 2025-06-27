@@ -1,0 +1,2 @@
+# After deleting both net3 and net4, no VlanNetworks should remain
+# Since this step deletes everything, there's nothing left to assert exists

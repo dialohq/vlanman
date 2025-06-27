@@ -1,0 +1,84 @@
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net3
+spec:
+  excludedNodes: ["nixos"]
+  gatewayIp: "192.168.100.3"
+  localSubnet: "192.168.300.0/24"
+  remoteSubnet: "192.168.400.0/24"
+  vlanId: 300
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan-manager-net3
+  namespace: vlanman-system
+  labels:
+    vlanman.dialo.ai/manager: net3
+spec:
+  template:
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: NotIn
+                values:
+                - nixos
+      containers:
+        - env:
+            - name: VLAN_ID
+              value: "300"
+          image: 192.168.10.201:5000/vlan-manager:latest-dev
+          name: vlan-manager
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      hostPID: true
+status:
+  currentNumberScheduled: 1
+  desiredNumberScheduled: 1
+  numberAvailable: 1
+  numberMisscheduled: 0
+  numberReady: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    job-name: create-vlan-job-net3-nixos2
+  name: create-vlan-job-net3-nixos2
+  namespace: vlanman-system
+spec:
+  template:
+    metadata:
+      labels:
+        batch.kubernetes.io/job-name: create-vlan-job-net3-nixos2
+        job-name: create-vlan-job-net3-nixos2
+    spec:
+      containers:
+        - env:
+            - name: PID
+            - name: ID
+              value: "300"
+          image: 192.168.10.201:5000/vlan-interface:latest-dev
+          imagePullPolicy: Always
+          name: create-vlan
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/hostname: nixos2
+status:
+  ready: 0
+  succeeded: 1
+  terminating: 0

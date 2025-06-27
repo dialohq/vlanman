@@ -1,8 +1,9 @@
 package v1
 
 import (
-	"dialo.ai/vlanman/internal/controller"
 	"net/http"
+
+	"dialo.ai/vlanman/internal/controller"
 
 	u "dialo.ai/vlanman/pkg/utils"
 
@@ -21,10 +22,10 @@ type MutatingWebhookHandler struct {
 
 // For dry run, we don't want side effects
 // so creating a lease is off the table
-type dummyLocker struct{}
+// type dummyLocker struct{}
 
-func (dl *dummyLocker) Lock()   {}
-func (dl *dummyLocker) Unlock() {}
+// func (dl *dummyLocker) Lock()   {}
+// func (dl *dummyLocker) Unlock() {}
 
 func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -44,13 +45,13 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 
 	_ = log.FromContext(ctx, "webhook", true, "PodName", in.Request.Name)
 	_ = false
-	if in.Request.DryRun != nil && *in.Request.DryRun == true {
+	if in.Request.DryRun != nil && *in.Request.DryRun {
 		_ = true
 	}
 }
 
-type jsonPatch struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value any    `json:"value"`
-}
+// type jsonPatch struct {
+// 	Op    string `json:"op"`
+// 	Path  string `json:"path"`
+// 	Value any    `json:"value"`
+// }

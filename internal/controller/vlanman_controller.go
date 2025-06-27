@@ -104,7 +104,7 @@ func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, 
 	return mgrs, nil
 }
 
-func (r *VlanmanReconciler) createDesiredState(ctx context.Context, networks []vlanmanv1.VlanNetwork) []ManagerSet {
+func (r *VlanmanReconciler) createDesiredState(networks []vlanmanv1.VlanNetwork) []ManagerSet {
 	mgrs := []ManagerSet{}
 	for _, net := range networks {
 		mgrs = append(mgrs, ManagerSet{
@@ -117,10 +117,23 @@ func (r *VlanmanReconciler) createDesiredState(ctx context.Context, networks []v
 }
 
 func (r *VlanmanReconciler) diffManagers(desired, current ManagerSet) []Action {
-	if reflect.DeepEqual(desired, current) {
-		return []Action{}
+	eq := true
+	eq = eq && desired.OwnerNetworkName == current.OwnerNetworkName
+	eq = eq && desired.VlanID == current.VlanID
+	if !eq {
+		return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
 	}
-	return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
+	if len(desired.ExcludedNodes) != len(current.ExcludedNodes) {
+		return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
+	}
+	slices.Sort(desired.ExcludedNodes)
+	slices.Sort(current.ExcludedNodes)
+	for idx, n := range desired.ExcludedNodes {
+		if n != current.ExcludedNodes[idx] {
+			return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
+		}
+	}
+	return []Action{}
 }
 
 func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet) []Action {
@@ -136,12 +149,15 @@ func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet) []Action {
 			acts = append(acts, &CreateManagerAction{Manager: desiredMgr})
 			continue
 		}
+		fmt.Println("These are the same manager: ", desiredMgr.OwnerNetworkName, current[idx].OwnerNetworkName)
 		acts = append(acts, r.diffManagers(desiredMgr, current[idx])...)
 	}
 
 	for _, currentMgr := range current {
 		_, found := slices.BinarySearchFunc(desired, currentMgr, managerCmp)
 		if !found {
+			fmt.Println("this manager is not in desired state: ", currentMgr)
+			fmt.Println("Desired staet: ", desired)
 			acts = append(acts, &DeleteManagerAction{Manager: currentMgr})
 		}
 	}
@@ -161,16 +177,16 @@ func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.
 		}
 	}
 
-	desired := r.createDesiredState(ctx, networkList.Items)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
+	fmt.Println("Creating desired")
+	desired := r.createDesiredState(networkList.Items)
 
+	fmt.Println("Getting current")
 	current, err := r.getCurrentState(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
+	fmt.Println("Diffing")
 	actions := r.diffStates(desired, current)
 
 	errList := []*ReconcileError{}
@@ -218,7 +234,7 @@ func hasVlanmanAnnotation(obj client.Object) bool {
 }
 
 func (r *VlanmanReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	var annotationPredicate = predicate.Funcs{
+	annotationPredicate := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
 			return hasVlanmanAnnotation(e.Object)
 		},

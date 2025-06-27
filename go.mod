@@ -1,6 +1,8 @@
 module dialo.ai/vlanman
 
-go 1.24.3
+go 1.24.0
+
+toolchain go1.24.4
 
 require (
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.83.0
@@ -12,7 +14,6 @@ require (
 
 require (
 	github.com/alecthomas/repr v0.4.0
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/stretchr/testify v1.10.0
 	github.com/vishvananda/netlink v1.3.1
 )
@@ -24,6 +25,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.8.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/zapr v1.3.0 // indirect

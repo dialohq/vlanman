@@ -1,0 +1,111 @@
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net1
+spec:
+  excludedNodes: []
+  gatewayIp: "192.168.100.1"
+  localSubnet: "192.168.100.0/24"
+  remoteSubnet: "192.168.200.0/24"
+  vlanId: 100
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan-manager-net1
+  namespace: vlanman-system
+  labels:
+    vlanman.dialo.ai/manager: net1
+spec:
+  template:
+    spec:
+      containers:
+        - env:
+            - name: VLAN_ID
+              value: "100"
+          image: 192.168.10.201:5000/vlan-manager:latest-dev
+          name: vlan-manager
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      hostPID: true
+status:
+  currentNumberScheduled: 2
+  desiredNumberScheduled: 2
+  numberAvailable: 2
+  numberMisscheduled: 0
+  numberReady: 2
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    job-name: create-vlan-job-net1-nixos
+  name: create-vlan-job-net1-nixos
+  namespace: vlanman-system
+spec:
+  template:
+    metadata:
+      labels:
+        batch.kubernetes.io/job-name: create-vlan-job-net1-nixos
+        job-name: create-vlan-job-net1-nixos
+    spec:
+      containers:
+        - env:
+            - name: PID
+            - name: ID
+              value: "100"
+          image: 192.168.10.201:5000/vlan-interface:latest-dev
+          imagePullPolicy: Always
+          name: create-vlan
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/hostname: nixos
+status:
+  ready: 0
+  succeeded: 1
+  terminating: 0
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    job-name: create-vlan-job-net1-nixos2
+  name: create-vlan-job-net1-nixos2
+  namespace: vlanman-system
+spec:
+  template:
+    metadata:
+      labels:
+        batch.kubernetes.io/job-name: create-vlan-job-net1-nixos2
+        job-name: create-vlan-job-net1-nixos2
+    spec:
+      containers:
+        - env:
+            - name: PID
+            - name: ID
+              value: "100"
+          image: 192.168.10.201:5000/vlan-interface:latest-dev
+          imagePullPolicy: Always
+          name: create-vlan
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+      hostNetwork: true
+      hostPID: true
+      nodeSelector:
+        kubernetes.io/hostname: nixos2
+status:
+  ready: 0
+  succeeded: 1
+  terminating: 0

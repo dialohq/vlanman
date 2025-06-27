@@ -1,0 +1,10 @@
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net4
+spec:
+  vlanId: 400
+  gatewayIp: "192.168.100.4"
+  localSubnet: "192.168.400.0/24"
+  remoteSubnet: "192.168.500.0/24"
+  excludedNodes: ["nixos2"]

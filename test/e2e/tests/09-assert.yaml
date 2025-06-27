@@ -1,0 +1,2 @@
+# After deleting net5, no VlanNetworks should remain
+# Since this step deletes the last network, there's nothing left to assert exists

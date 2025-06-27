@@ -83,7 +83,9 @@
             pkgs.tokei # loc count
             pkgs.skopeo
             pkgs.claude-code
+            pkgs.codex
             pkgs.glow
+            pkgs.mods
           ];
           shellHook = ''
             go mod tidy

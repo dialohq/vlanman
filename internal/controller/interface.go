@@ -17,17 +17,19 @@ type InterfacePod struct {
 }
 
 func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkName, pullPolicy string) batchv1.Job {
+	var tgp int64 = 1
 	return batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      strings.Join([]string{vlanmanv1.JobNamePrefix, networkName, p.Spec.NodeName}, "-"),
-			Namespace: p.ObjectMeta.Namespace,
+			Namespace: p.Namespace,
 		},
 		Spec: batchv1.JobSpec{
 			TTLSecondsAfterFinished: ttl,
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					HostNetwork: true,
-					HostPID:     true,
+					TerminationGracePeriodSeconds: &tgp,
+					HostNetwork:                   true,
+					HostPID:                       true,
 					NodeSelector: map[string]string{
 						"kubernetes.io/hostname": p.Spec.NodeName,
 					},

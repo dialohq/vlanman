@@ -14,7 +14,7 @@ import (
 	"github.com/alecthomas/repr"
 )
 
-func pid(w http.ResponseWriter, r *http.Request) {
+func pid(w http.ResponseWriter, _ *http.Request) {
 	fmt.Println("Sending pid", os.Getpid())
 	resp := comms.PIDResponse{
 		PID: os.Getpid(),
@@ -27,7 +27,8 @@ func pid(w http.ResponseWriter, r *http.Request) {
 		repr.Println(resp)
 	}
 }
-func ready(w http.ResponseWriter, r *http.Request) {
+
+func ready(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	if watcher != nil {
 		if watcher.UP.Load() {

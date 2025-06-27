@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"time"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"dialo.ai/vlanman/pkg/comms"
 	errs "dialo.ai/vlanman/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -97,8 +99,13 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 	}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: daemonSet.Name, Namespace: daemonSet.Namespace}, &daemonSet)
 	timeout := 1
-	for err != nil && apierrors.IsNotFound(err) && timeout <= vlanmanv1.WaitForDaemonTimeout {
+	for ((err != nil && apierrors.IsNotFound(err)) ||
+		reflect.DeepEqual(daemonSet.Status, appsv1.DaemonSetStatus{})) &&
+		timeout <= vlanmanv1.WaitForDaemonTimeout {
+
+		log.Info("Waiting for daemonset")
 		time.Sleep(time.Second / 2)
+
 		err = r.Client.Get(ctx, types.NamespacedName{Name: daemonSet.Name, Namespace: daemonSet.Namespace}, &daemonSet)
 		timeout += 1
 	}
@@ -213,6 +220,14 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			}
 		}
 
+		if resp == nil || resp.Body == nil {
+			return &errs.RequestError{
+				Location: "CreateManagerAction/CreateJob",
+				Action:   "Get PID",
+				Err:      fmt.Errorf("response or response body is nil"),
+			}
+		}
+
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return &errs.ParsingError{
@@ -246,6 +261,13 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 				Location: "CreateManagerAction",
 				Action:   "CheckDaemonReady",
 				Err:      err,
+			}
+		}
+		if resp == nil {
+			return &errs.RequestError{
+				Location: "CreateManagerAction",
+				Action:   "CheckDaemonReady",
+				Err:      fmt.Errorf("Response is nil"),
 			}
 		}
 		for resp.StatusCode != 200 && timeout <= vlanmanv1.WaitForDaemonTimeout {
