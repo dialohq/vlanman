@@ -163,11 +163,11 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 			},
 			ObjectMeta: metav1.ObjectMeta{Name: "test-network"},
 			Spec: vlanmanv1.VlanNetworkSpec{
-				VlanID:        200,
-				GatewayIP:     "192.168.1.1",
-				LocalSubnet:   "192.168.1.0/24",
-				RemoteSubnet:  "192.168.2.0/24",
-				ExcludedNodes: []string{},
+				VlanID:         200,
+				LocalGatewayIP: "192.168.1.1",
+				LocalSubnet:    "192.168.1.0/24",
+				RemoteSubnet:   "192.168.2.0/24",
+				ExcludedNodes:  []string{},
 			},
 		}
 
@@ -213,11 +213,11 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 			},
 			ObjectMeta: metav1.ObjectMeta{Name: "duplicate-network"},
 			Spec: vlanmanv1.VlanNetworkSpec{
-				VlanID:        100, // Same as existing network
-				GatewayIP:     "192.168.1.1",
-				LocalSubnet:   "192.168.1.0/24",
-				RemoteSubnet:  "192.168.2.0/24",
-				ExcludedNodes: []string{},
+				VlanID:         100, // Same as existing network
+				LocalGatewayIP: "192.168.1.1",
+				LocalSubnet:    "192.168.1.0/24",
+				RemoteSubnet:   "192.168.2.0/24",
+				ExcludedNodes:  []string{},
 			},
 		}
 
@@ -264,11 +264,11 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 			},
 			ObjectMeta: metav1.ObjectMeta{Name: "no-nodes-network"},
 			Spec: vlanmanv1.VlanNetworkSpec{
-				VlanID:        300,
-				GatewayIP:     "192.168.1.1",
-				LocalSubnet:   "192.168.1.0/24",
-				RemoteSubnet:  "192.168.2.0/24",
-				ExcludedNodes: []string{"node1", "node2"}, // Exclude all nodes
+				VlanID:         300,
+				LocalGatewayIP: "192.168.1.1",
+				LocalSubnet:    "192.168.1.0/24",
+				RemoteSubnet:   "192.168.2.0/24",
+				ExcludedNodes:  []string{"node1", "node2"}, // Exclude all nodes
 			},
 		}
 

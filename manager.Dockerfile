@@ -17,6 +17,8 @@ RUN --mount=type=cache,target=/build GOOS=linux GOARCH=${PLATFORM} CGO_ENABLED=0
 
 FROM ubuntu:latest
 
+RUN apt update -y && apt install -y iproute2
+
 WORKDIR /
 
 COPY --from=builder /workspace/manager .

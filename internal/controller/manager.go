@@ -5,14 +5,20 @@ import (
 	"strings"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
+	u "dialo.ai/vlanman/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type ManagerSet struct {
 	OwnerNetworkName string
 	VlanID           int64
+	GatewayIP        string
+	GatewaySubnet    int64
+	LocalRoutes      []string
+	RemoteRoutes     []string
 	ExcludedNodes    []string
 }
 
@@ -51,7 +57,8 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 					},
 				},
 				Spec: corev1.PodSpec{
-					HostPID: true,
+					ServiceAccountName: e.ServiceAccountName,
+					HostPID:            true,
 					Containers: []corev1.Container{
 						{
 							Name:            vlanmanv1.ManagerContainerName,
@@ -61,6 +68,30 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 								{
 									Name:  "VLAN_ID",
 									Value: strconv.FormatInt(mgr.VlanID, 10),
+								},
+								{
+									Name:  "NAMESPACE",
+									Value: e.NamespaceName,
+								},
+								{
+									Name:  "LOCK_NAME",
+									Value: vlanmanv1.LeaderElectionLeaseName + "-" + mgr.OwnerNetworkName,
+								},
+								{
+									Name:  "LOCAL_GATEWAY_IP",
+									Value: mgr.GatewayIP,
+								},
+								{
+									Name:  "LOCAL_GATEWAY_SUBNET",
+									Value: strconv.FormatInt(int64(mgr.GatewaySubnet), 10),
+								},
+								{
+									Name:  "REMOTE_ROUTES",
+									Value: strings.Join(mgr.RemoteRoutes, ","),
+								},
+								{
+									Name:  "LOCAL_ROUTES",
+									Value: strings.Join(mgr.LocalRoutes, ","),
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
@@ -101,6 +132,29 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 	return spec
 }
 
+func serviceForManagerSet(d ManagerSet, namespace string) corev1.Service {
+	return corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      strings.Join([]string{d.OwnerNetworkName, vlanmanv1.ServiceNameSuffix}, "-"),
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Selector: map[string]string{
+				vlanmanv1.ManagerSetLabelKey: d.OwnerNetworkName,
+			},
+			InternalTrafficPolicy: u.Ptr(corev1.ServiceInternalTrafficPolicy("Local")),
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "manager",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       61410,
+					TargetPort: intstr.FromInt(61410),
+				},
+			},
+		},
+	}
+}
+
 func managerFromSet(d appsv1.DaemonSet) ManagerSet {
 	excludedNodes := []string{}
 	if d.Spec.Template.Spec.Affinity != nil &&
@@ -115,10 +169,36 @@ func managerFromSet(d appsv1.DaemonSet) ManagerSet {
 		}
 	}
 
-	val, _ := strconv.ParseInt(d.Spec.Template.Spec.Containers[0].Env[0].Value, 10, 64)
+	envs := d.Spec.Template.Spec.Containers[0].Env
+	var vlanID int64 = -1
+	gatewayIP := "empty"
+	var gatewaySubnet int64 = -1
+	remoteRoutes := []string{}
+	localRoutes := []string{}
+	for _, e := range envs {
+		switch e.Name {
+		case "VLAN_ID":
+			vlanID, _ = strconv.ParseInt(e.Value, 10, 64)
+		case "VLAN_SUBNET":
+			gatewaySubnet, _ = strconv.ParseInt(e.Value, 10, 64)
+		case "VLAN_IP":
+			gatewayIP = e.Value
+		case "REMOTE_ROUTES":
+			remoteRoutes = strings.Split(e.Value, ",")
+		case "LOCAL_ROUTES":
+			localRoutes = strings.Split(e.Value, ",")
+		default:
+			continue
+		}
+	}
+
 	return ManagerSet{
 		OwnerNetworkName: d.Labels[vlanmanv1.ManagerSetLabelKey],
-		VlanID:           val,
+		VlanID:           vlanID,
+		GatewayIP:        gatewayIP,
+		RemoteRoutes:     remoteRoutes,
+		LocalRoutes:      localRoutes,
+		GatewaySubnet:    gatewaySubnet,
 		ExcludedNodes:    excludedNodes,
 	}
 }
@@ -137,9 +217,18 @@ func getPullPolicy(pp string) corev1.PullPolicy {
 }
 
 func createDesiredManagerSet(network vlanmanv1.VlanNetwork) ManagerSet {
+	gwIP, gwSn, found := strings.Cut(network.Spec.LocalGatewayIP, "/")
+	if !found {
+		gwSn = "32"
+	}
+	gwSnInt, _ := strconv.ParseInt(gwSn, 10, 64)
 	return ManagerSet{
 		OwnerNetworkName: network.Name,
 		VlanID:           int64(network.Spec.VlanID),
+		GatewayIP:        gwIP,
+		RemoteRoutes:     network.Spec.RemoteSubnet,
+		LocalRoutes:      network.Spec.LocalSubnet,
+		GatewaySubnet:    gwSnInt,
 		ExcludedNodes:    network.Spec.ExcludedNodes,
 	}
 }

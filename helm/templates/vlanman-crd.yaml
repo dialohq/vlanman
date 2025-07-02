@@ -21,29 +21,49 @@ spec:
             spec:
               type: object
               properties:
-                gatewayIp:
+                pools:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                localGatewayIp:
                   type: string
-                  format: ipv4
+                remoteGatewayIp:
+                  type: string
                 excludedNodes:
                   type: array
                   items:
                     type: string
                 localSubnet:
-                  type: string
+                  type: array
+                  items:
+                    type: string
                 remoteSubnet:
-                  type: string
+                  type: array
+                  items:
+                    type: string
                 vlanId:
                   type: integer
               required:
-                - gatewayIp
-                - localSubnet
                 - remoteSubnet
                 - vlanId
             status:
               type: object
               properties:
-                active:
-                  type: boolean
+                freeIPs:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                pendingIPs:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+
       subresources:
         status: {}
       additionalPrinterColumns:

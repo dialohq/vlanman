@@ -3,18 +3,26 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
+	"github.com/alecthomas/repr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	k8sRuntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	errs "dialo.ai/vlanman/pkg/errors"
+	"dialo.ai/vlanman/pkg/locker"
+	u "dialo.ai/vlanman/pkg/utils"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -38,12 +46,16 @@ type Envs struct {
 	TTL                      *int32
 	InterfacePodImage        string
 	InterfacePodPullPolicy   string
+	WorkerInitImage          string
+	WorkerInitPullPolicy     string
+	ServiceAccountName       string
 }
 
 type VlanmanReconciler struct {
 	Client client.Client
 	Scheme *k8sRuntime.Scheme
 	Env    Envs
+	Config *rest.Config
 }
 
 type ReconcileError struct {
@@ -73,8 +85,32 @@ func (e *ReconcileErrorList) Error() string {
 	return msg
 }
 
-func (r *VlanmanReconciler) ReconcilePod(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
-	return ctrl.Result{}, &errs.UnimplementedError{Feature: "Pod reconciliation"}
+func (r *VlanmanReconciler) reconcilePod(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+	log := log.FromContext(ctx)
+	pod := corev1.Pod{}
+	err := r.Client.Get(ctx, req.NamespacedName, &pod)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			rq, err := r.updateAllNetworksStatus(ctx)
+			if err != nil || rq == false {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+		return ctrl.Result{}, errs.NewClientRequestError("Get pod in reconcilePod", err)
+	}
+	if pod.Status.PodIP == "" {
+		log.Info("Pod doesnt have IP assigned yet, requeing", "pod", req.Name)
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
+	rq, err := r.updateAllNetworksStatus(ctx)
+	if err != nil || rq == false {
+		return ctrl.Result{}, err
+	}
+	if rq {
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
+	return ctrl.Result{}, nil
 }
 
 func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, error) {
@@ -106,11 +142,7 @@ func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, 
 func (r *VlanmanReconciler) createDesiredState(networks []vlanmanv1.VlanNetwork) []ManagerSet {
 	mgrs := []ManagerSet{}
 	for _, net := range networks {
-		mgrs = append(mgrs, ManagerSet{
-			OwnerNetworkName: net.Name,
-			VlanID:           int64(net.Spec.VlanID),
-			ExcludedNodes:    net.Spec.ExcludedNodes,
-		})
+		mgrs = append(mgrs, createDesiredManagerSet(net))
 	}
 	return mgrs
 }
@@ -148,26 +180,29 @@ func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet) []Action {
 			acts = append(acts, &CreateManagerAction{Manager: desiredMgr})
 			continue
 		}
-		fmt.Println("These are the same manager: ", desiredMgr.OwnerNetworkName, current[idx].OwnerNetworkName)
 		acts = append(acts, r.diffManagers(desiredMgr, current[idx])...)
 	}
 
 	for _, currentMgr := range current {
 		_, found := slices.BinarySearchFunc(desired, currentMgr, managerCmp)
 		if !found {
-			fmt.Println("this manager is not in desired state: ", currentMgr)
-			fmt.Println("Desired staet: ", desired)
 			acts = append(acts, &DeleteManagerAction{Manager: currentMgr})
 		}
 	}
 	return acts
 }
 
-func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
+func (r *VlanmanReconciler) reconcileNetwork(ctx context.Context) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 
+	errList := []*ReconcileError{}
+	rq, err := r.updateAllNetworksStatus(ctx)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	networkList := &vlanmanv1.VlanNetworkList{}
-	err := r.Client.List(ctx, networkList)
+	err = r.Client.List(ctx, networkList)
 	if err != nil {
 		return ctrl.Result{}, &errs.ClientRequestError{
 			Action: "List VlanNetworks",
@@ -175,22 +210,20 @@ func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.
 		}
 	}
 
-	fmt.Println("Creating desired")
 	desired := r.createDesiredState(networkList.Items)
 
-	fmt.Println("Getting current")
 	current, err := r.getCurrentState(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	fmt.Println("Diffing")
 	actions := r.diffStates(desired, current)
 
-	errList := []*ReconcileError{}
 	if len(actions) == 0 {
 		log.Info("No actions to take")
-		return ctrl.Result{}, nil
+		if rq {
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
 	} else {
 		for _, action := range actions {
 			log.Info("Doing action", "type", reflect.TypeOf(action))
@@ -209,17 +242,150 @@ func (r *VlanmanReconciler) ReconcileNetwork(ctx context.Context, req reconcile.
 		}
 	}
 
+	if rq {
+		return ctrl.Result{RequeueAfter: time.Second}, nil
+	}
 	return ctrl.Result{}, nil
+}
+
+func extractVlan(pod corev1.Pod) (string, bool) {
+	subnet := ""
+	ip := ""
+	for _, cont := range pod.Spec.InitContainers {
+		for _, e := range cont.Env {
+			if e.Name == "MACVLAN_IP" {
+				ip = e.Value
+			}
+			if e.Name == "MACVLAN_SUBNET" {
+				subnet = e.Value
+			}
+		}
+	}
+	fullIp := ip
+	if subnet != "" {
+		fullIp += "/" + subnet
+	}
+	return fullIp, ip != ""
+}
+
+func (r *VlanmanReconciler) updateNetworkStatus(ctx context.Context, network vlanmanv1.VlanNetwork) (bool, error) {
+	pods := corev1.PodList{}
+	selector := labels.NewSelector()
+	requirement, err := labels.NewRequirement(vlanmanv1.WorkerPodLabelKey, "==", []string{network.Name})
+	if err != nil || requirement == nil {
+		return true, &errs.InternalError{
+			Context: "Couldn't create a requirement for a label selector in updateNetworkStatus: " + err.Error(),
+		}
+	}
+	selector = selector.Add(*requirement)
+	opts := client.ListOptions{
+		LabelSelector: selector,
+	}
+	err = r.Client.List(ctx, &pods, &opts)
+	if err != nil {
+		return true, errs.NewClientRequestError(
+			"List Pods in updateNetworkStatus",
+			err,
+		)
+	}
+	poolNames := slices.Collect(maps.Keys(network.Spec.Pools))
+	network.Status = u.PopulateStatus(network.Status, poolNames...)
+	initialPools := maps.Clone(network.Spec.Pools)
+	pending := maps.Clone(network.Status.PendingIPs)
+
+	requeue := false
+	for _, pod := range pods.Items {
+		fmt.Println("Checking pod ", pod.Name)
+		podPool, ok := pod.Annotations[vlanmanv1.PodVlanmanIPPoolAnnotation]
+		if !ok {
+			return requeue, &errs.UnrecoverableError{
+				Context: "Pod should have macvlan ip but doesn't",
+				Err:     errs.ErrNilUnrecoverable,
+			}
+		}
+		podIP, found := extractVlan(pod)
+		fmt.Println("Pod has ip", podIP)
+		if !found {
+			continue
+		}
+
+		initialPools[podPool] = slices.DeleteFunc(initialPools[podPool], func(ip string) bool {
+			fmt.Println("in initial")
+			if ip != podIP {
+				fmt.Println(ip, "doesnt equal", podIP)
+			} else {
+				fmt.Println(ip, "equals", podIP)
+			}
+			return ip == podIP
+		})
+
+		pending[podPool] = slices.DeleteFunc(pending[podPool], func(ip string) bool {
+			fmt.Println("in pending")
+			if ip != podIP {
+				fmt.Println(ip, "doesnt equal", podIP)
+			} else {
+				fmt.Println(ip, "equals", podIP)
+			}
+			return ip == podIP
+		})
+	}
+	repr.Println(initialPools)
+	network.Status.PendingIPs = pending
+	network.Status.FreeIPs = initialPools
+
+	repr.Println(network.Status)
+	err = r.Client.Status().Update(ctx, &network)
+	if err != nil {
+		return requeue, errs.NewClientRequestError(fmt.Sprintf("Update status for network '%s'", network.Name), err)
+	}
+
+	return requeue, nil
+}
+
+func (r *VlanmanReconciler) updateAllNetworksStatus(ctx context.Context) (bool, error) {
+	clientSet, err := kubernetes.NewForConfig(r.Config)
+	if err != nil || clientSet == nil {
+		return false, &errs.UnrecoverableError{
+			Context: "Couldn't create a clientset for updating status",
+			Err:     err,
+		}
+	}
+
+	lckr, err := locker.NewLeaseLocker(false, *clientSet, vlanmanv1.LeaseName, r.Env.NamespaceName)
+	if err != nil || lckr == nil {
+		return false, &errs.UnrecoverableError{
+			Context: "Couldn't create lease locker for updating status",
+			Err:     err,
+		}
+	}
+
+	lckr.Lock()
+	networks := vlanmanv1.VlanNetworkList{}
+	err = r.Client.List(ctx, &networks)
+	if err != nil {
+		return false, errs.NewClientRequestError("List networks", err)
+	}
+
+	requeue := false
+	for _, network := range networks.Items {
+		requeue, err = r.updateNetworkStatus(ctx, network)
+		if err != nil {
+			return false, err
+		}
+	}
+	lckr.Unlock()
+	return requeue, nil
 }
 
 func (r *VlanmanReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 	log.Info("Starting reconciler")
+
 	if req.Namespace == "" {
-		return r.ReconcileNetwork(ctx, req)
+		return r.reconcileNetwork(ctx)
 	}
 
-	return r.ReconcilePod(ctx, req)
+	return r.reconcilePod(ctx, req)
 }
 
 func hasVlanmanAnnotation(obj client.Object) bool {

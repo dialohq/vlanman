@@ -1,18 +1,20 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
 
-	"github.com/vishvananda/netlink"
+	ip "github.com/vishvananda/netlink"
 )
 
 type VlanWatcher struct {
 	ID     int
 	Exists atomic.Bool
 	UP     atomic.Bool
+	Link   ip.Link
 }
 
 // Can't use something like fsnotify here
@@ -35,15 +37,17 @@ func (v *VlanWatcher) Watch() error {
 		for _, ent := range ents {
 			if ent.Name() == ifaceName {
 				v.Exists.Store(true)
-				link, err := netlink.LinkByName(ifaceName)
+				link, err := ip.LinkByName(ifaceName)
 				if err != nil {
 					return err
 				}
-				err = netlink.LinkSetUp(link)
+				err = ip.LinkSetUp(link)
 				if err != nil {
 					return err
 				}
 				v.UP.Store(true)
+				v.Link = link
+				fmt.Println("Vlan found")
 				return nil
 			}
 		}

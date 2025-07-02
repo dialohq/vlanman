@@ -3,12 +3,6 @@ kind: TestSuite
 metadata:
   name: vlanman-e2e
 spec:
-  startControlPlane: true
-  startKUBE: true
-  manifestDirs:
-    - ../../helm/templates
-  testDirs:
-    - ./tests
-  timeout: 300
-  parallel: 1
+  timeout: 30
+  parallel: 2
   skipDelete: false

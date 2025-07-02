@@ -91,10 +91,10 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
-					VlanID:       100,
-					GatewayIP:    "192.168.1.1",
-					LocalSubnet:  "192.168.1.0/24",
-					RemoteSubnet: "192.168.2.0/24",
+					VlanID:         100,
+					LocalGatewayIP: "192.168.1.1",
+					LocalSubnet:    "192.168.1.0/24",
+					RemoteSubnet:   "192.168.2.0/24",
 				},
 			},
 			expectedManager: ManagerSet{
@@ -111,11 +111,11 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					Namespace: "kube-system",
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
-					VlanID:        200,
-					GatewayIP:     "10.0.0.1",
-					LocalSubnet:   "10.0.0.0/16",
-					RemoteSubnet:  "10.1.0.0/16",
-					ExcludedNodes: []string{"node1", "node2"},
+					VlanID:         200,
+					LocalGatewayIP: "10.0.0.1",
+					LocalSubnet:    "10.0.0.0/16",
+					RemoteSubnet:   "10.1.0.0/16",
+					ExcludedNodes:  []string{"node1", "node2"},
 				},
 			},
 			expectedManager: ManagerSet{
@@ -147,11 +147,11 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					Name: "zero-vlan-network",
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
-					VlanID:        0,
-					GatewayIP:     "172.16.0.1",
-					LocalSubnet:   "172.16.0.0/12",
-					RemoteSubnet:  "172.17.0.0/12",
-					ExcludedNodes: []string{},
+					VlanID:         0,
+					LocalGatewayIP: "172.16.0.1",
+					LocalSubnet:    "172.16.0.0/12",
+					RemoteSubnet:   "172.17.0.0/12",
+					ExcludedNodes:  []string{},
 				},
 			},
 			expectedManager: ManagerSet{

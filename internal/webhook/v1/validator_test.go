@@ -208,9 +208,9 @@ func TestNewCreationValidator(t *testing.T) {
 		vlanNetwork := &vlanmanv1.VlanNetwork{
 			ObjectMeta: metav1.ObjectMeta{Name: "test-network"},
 			Spec: vlanmanv1.VlanNetworkSpec{
-				VlanID:      200,
-				GatewayIP:   "192.168.1.1",
-				LocalSubnet: "192.168.1.0/24",
+				VlanID:         200,
+				LocalGatewayIP: "192.168.1.1",
+				LocalSubnet:    "192.168.1.0/24",
 			},
 		}
 

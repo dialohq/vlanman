@@ -26,3 +26,9 @@ metadata:
     job-name: create-vlan-job-net1-nixos2
   name: create-vlan-job-net1-nixos2
   namespace: vlanman-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: net1-service
+  namespace: vlanman-system

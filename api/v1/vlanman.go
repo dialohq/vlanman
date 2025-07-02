@@ -21,15 +21,18 @@ type VlanNetworkList struct {
 }
 
 type VlanNetworkSpec struct {
-	GatewayIP     string   `json:"gatewayIp"`
-	LocalSubnet   string   `json:"localSubnet"`
-	RemoteSubnet  string   `json:"remoteSubnet"`
-	VlanID        int      `json:"vlanId"`
-	ExcludedNodes []string `json:"excludedNodes,omitempty"`
+	LocalGatewayIP  string              `json:"localGatewayIp"`
+	RemoteGatewayIP string              `json:"remoteGatewayIp"`
+	LocalSubnet     []string            `json:"localSubnet"`
+	RemoteSubnet    []string            `json:"remoteSubnet"`
+	VlanID          int                 `json:"vlanId"`
+	ExcludedNodes   []string            `json:"excludedNodes,omitempty"`
+	Pools           map[string][]string `json:"pools"`
 }
 
 type VlanNetworkStatus struct {
-	Active bool `json:"active"`
+	FreeIPs    map[string][]string `json:"freeIPs"`
+	PendingIPs map[string][]string `json:"pendingIPs"`
 }
 
 func init() {

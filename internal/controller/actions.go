@@ -110,7 +110,7 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 	}
 
 	if err != nil {
-		return errs.NewClientRequestError("CreateManagerAction", "GetDaemonset", err)
+		return errs.NewClientRequestError("GetDaemonset", err)
 	}
 
 	// not created, don't have to clean up
@@ -181,7 +181,7 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		log.Info("Waiting for daemonset to create all pods", "ready", ready)
 		err = r.Client.List(ctx, pods, &opts)
 		if err != nil {
-			return errs.NewClientRequestError("CreateManager", "ListPods", err)
+			return errs.NewClientRequestError("ListPods", err)
 		}
 	}
 	log.Info("Pods", "number", len(pods.Items), "Desired", daemonSet.Status.DesiredNumberScheduled)
@@ -276,6 +276,14 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			tries += 1
 		}
 	}
+	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
+	err = r.Client.Create(ctx, &svc)
+	if err != nil {
+		return &errs.ClientRequestError{
+			Action: "CreateService",
+			Err:    err,
+		}
+	}
 	return nil
 }
 
@@ -284,12 +292,20 @@ type DeleteManagerAction struct {
 }
 
 func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) error {
-	fmt.Println("Deleting manager: ", a.Manager.OwnerNetworkName)
 	daemonSet := daemonSetFromManager(a.Manager, r.Env)
 	err := r.Client.Delete(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
 			Action: "Delete daemonset",
+			Err:    err,
+		}
+	}
+
+	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
+	err = r.Client.Delete(ctx, &svc)
+	if err != nil {
+		return &errs.ClientRequestError{
+			Action: "Delete service",
 			Err:    err,
 		}
 	}

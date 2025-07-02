@@ -23,11 +23,11 @@ spec:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
-            - matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: NotIn
-                values:
-                - nixos2
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - nixos2
       containers:
         - env:
             - name: VLAN_ID
@@ -82,3 +82,18 @@ status:
   ready: 0
   succeeded: 1
   terminating: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: net4-service
+  namespace: vlanman-system
+spec:
+  internalTrafficPolicy: Local
+  ports:
+    - name: manager
+      port: 61410
+      protocol: TCP
+      targetPort: 61410
+  selector:
+    vlanman.dialo.ai/manager: net4

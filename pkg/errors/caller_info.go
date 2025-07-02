@@ -21,7 +21,7 @@ func (ci CallerInfo) String() string {
 
 func GetCallerInfo() CallerInfo {
 	pcs := make([]uintptr, 1)
-	n := runtime.Callers(2, pcs)
+	n := runtime.Callers(8, pcs)
 	if n != 1 {
 		return CallerInfo{
 			Err: &UnrecoverableError{

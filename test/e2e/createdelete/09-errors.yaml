@@ -1,0 +1,10 @@
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: net5-service
+  namespace: vlanman-system

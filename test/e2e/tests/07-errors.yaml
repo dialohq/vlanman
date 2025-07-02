@@ -1,9 +1,0 @@
-apiVersion: vlanman.dialo.ai/v1
-kind: VlanNetwork
-metadata:
-  name: net3
----
-apiVersion: vlanman.dialo.ai/v1
-kind: VlanNetwork
-metadata:
-  name: net4

@@ -36,7 +36,7 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), manager.Options{
 		Scheme: scheme,
 	})
-	if err != nil {
+	if err != nil || mgr == nil {
 		logger.Error(err, "Creating manager failed")
 		os.Exit(1)
 	}
@@ -65,6 +65,9 @@ func main() {
 		VlanManagerPullPolicy:    os.Getenv("MANAGER_PULL_POLICY"),
 		InterfacePodImage:        os.Getenv("INTERFACE_POD_IMAGE"),
 		InterfacePodPullPolicy:   os.Getenv("INTERFACE_PULL_POLICY"),
+		WorkerInitImage:          os.Getenv("WORKER_IMAGE"),
+		WorkerInitPullPolicy:     os.Getenv("WORKER_PULL_POLICY"),
+		ServiceAccountName:       os.Getenv("SERVICE_ACCOUNT_NAME"),
 		WaitForPodTimeoutSeconds: podTimeout,
 		TTL:                      ttl,
 		IsTest:                   false,
@@ -82,6 +85,7 @@ func main() {
 	if err = (&controller.VlanmanReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Config: mgr.GetConfig(),
 		Env:    e,
 	}).SetupWithManager(mgr); err != nil {
 		logger.Error(err, "Creating controller failed")

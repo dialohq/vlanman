@@ -1,28 +1,40 @@
 apiVersion: vlanman.dialo.ai/v1
 kind: VlanNetwork
 metadata:
-  name: net1
+  name: netwithpods1
 spec:
   excludedNodes: []
   gatewayIp: "192.168.100.1"
   localSubnet: "192.168.100.0/24"
   remoteSubnet: "192.168.200.0/24"
-  vlanId: 100
+  vlanId: 110
+  pools:
+    primary:
+      - 10.0.1.1
+      - 10.0.1.2
+      - 10.0.1.3
+status:
+  freeIPs:
+    primary:
+      - 10.0.1.1
+      - 10.0.1.2
+      - 10.0.1.3
+  pendingIPs: {}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: vlan-manager-net1
+  name: vlan-manager-netwithpods1
   namespace: vlanman-system
   labels:
-    vlanman.dialo.ai/manager: net1
+    vlanman.dialo.ai/manager: netwithpods1
 spec:
   template:
     spec:
       containers:
         - env:
             - name: VLAN_ID
-              value: "100"
+              value: "110"
           image: 192.168.10.201:5000/vlan-manager:latest-dev
           name: vlan-manager
           securityContext:
@@ -42,21 +54,21 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    job-name: create-vlan-job-net1-nixos
-  name: create-vlan-job-net1-nixos
+    job-name: create-vlan-job-netwithpods1-nixos
+  name: create-vlan-job-netwithpods1-nixos
   namespace: vlanman-system
 spec:
   template:
     metadata:
       labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net1-nixos
-        job-name: create-vlan-job-net1-nixos
+        batch.kubernetes.io/job-name: create-vlan-job-netwithpods1-nixos
+        job-name: create-vlan-job-netwithpods1-nixos
     spec:
       containers:
         - env:
             - name: PID
             - name: ID
-              value: "100"
+              value: "110"
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan
@@ -78,21 +90,21 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    job-name: create-vlan-job-net1-nixos2
-  name: create-vlan-job-net1-nixos2
+    job-name: create-vlan-job-netwithpods1-nixos2
+  name: create-vlan-job-netwithpods1-nixos2
   namespace: vlanman-system
 spec:
   template:
     metadata:
       labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net1-nixos2
-        job-name: create-vlan-job-net1-nixos2
+        batch.kubernetes.io/job-name: create-vlan-job-netwithpods1-nixos2
+        job-name: create-vlan-job-netwithpods1-nixos2
     spec:
       containers:
         - env:
             - name: PID
             - name: ID
-              value: "100"
+              value: "110"
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan
@@ -109,3 +121,18 @@ status:
   ready: 0
   succeeded: 1
   terminating: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netwithpods1-service
+  namespace: vlanman-system
+spec:
+  internalTrafficPolicy: Local
+  ports:
+    - name: manager
+      port: 61410
+      protocol: TCP
+      targetPort: 61410
+  selector:
+    vlanman.dialo.ai/manager: netwithpods1

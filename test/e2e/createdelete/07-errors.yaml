@@ -1,0 +1,37 @@
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net3
+---
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: net4
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan-manager-net4
+  namespace: vlanman-system
+  labels:
+    vlanman.dialo.ai/manager: net4
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: net4-service
+  namespace: vlanman-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vlan-manager-net3
+  namespace: vlanman-system
+  labels:
+    vlanman.dialo.ai/manager: net3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: net3-service
+  namespace: vlanman-system

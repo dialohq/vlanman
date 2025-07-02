@@ -1,40 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"strconv"
 
+	u "dialo.ai/vlanman/pkg/utils"
 	ip "github.com/vishvananda/netlink"
 )
-
-func findDefaultInterface() (*ip.Link, error) {
-	_, dflt, err := net.ParseCIDR("0.0.0.0/0")
-	if err != nil {
-		return nil, fmt.Errorf("error parsing CIDR: %s", err.Error())
-	}
-	links, err := ip.LinkList()
-	if err != nil {
-		return nil, fmt.Errorf("error listing links: %s", err.Error())
-	}
-	for _, l := range links {
-		routes, err := ip.RouteList(l, ip.FAMILY_V4)
-		if err != nil {
-			return nil, fmt.Errorf("error listing routes for device %s: %s", l.Attrs().Name, err.Error())
-		}
-		if len(routes) == 0 {
-			continue
-		}
-		for _, r := range routes {
-			if r.Dst.String() == dflt.String() {
-				return &l, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("Default route not found")
-}
 
 func main() {
 	h := slog.NewJSONHandler(os.Stdout, nil)
@@ -54,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	dflt, err := findDefaultInterface()
+	dflt, err := u.FindDefaultInterface()
 	if err != nil {
 		log.Error("Couldn't find default interface", "error", err)
 		os.Exit(1)

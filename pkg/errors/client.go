@@ -20,7 +20,7 @@ func (e *ClientRequestError) Unwrap() error {
 	return e.Err
 }
 
-func NewClientRequestError(loc, act string, err error) error {
+func NewClientRequestError(act string, err error) error {
 	return fmt.Errorf("%w: %w", ErrK8sClient, &ClientRequestError{
 		Action: act,
 		Err:    err,

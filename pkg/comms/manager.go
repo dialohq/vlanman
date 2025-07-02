@@ -10,3 +10,12 @@ type AddVlanResponse struct {
 type PIDResponse struct {
 	PID int `json:"pid"`
 }
+
+type MacvlanRequest struct {
+	NsID int64 `json:"ns_id"`
+}
+
+type MacvlanResponse struct {
+	Ok  bool  `json:"ok"`
+	Err error `json:"err"`
+}

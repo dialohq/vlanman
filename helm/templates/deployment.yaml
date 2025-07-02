@@ -54,8 +54,14 @@ spec:
               value: "{{ .Values.interface.image }}"
             - name: INTERFACE_PULL_POLICY
               value: "{{ .Values.interface.pullPolicy }}"
+            - name: WORKER_IMAGE
+              value: "{{ .Values.worker.image }}"
+            - name: WORKER_PULL_POLICY
+              value: "{{ .Values.worker.pullPolicy }}"
             - name: JOB_TTL
               value: "{{ .Values.interface.jobTTLSeconds }}"
+            - name: SERVICE_ACCOUNT_NAME
+              value: "{{ .Values.serviceAccount.name }}"
           volumeMounts:
           - name: {{ .Values.webhook.volumes.name }}
             mountPath: {{ .Values.webhook.volumes.mountPath }}

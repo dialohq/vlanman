@@ -67,15 +67,28 @@ func getAction(req *admissionv1.AdmissionRequest) any {
 }
 
 func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r == nil {
+		fmt.Println(&errs.UnrecoverableError{
+			Context: "In ValidatingWebhookHandler the request is nil",
+			Err:     errs.ErrNilUnrecoverable,
+		})
+		return
+	}
 	in, err := u.ParseRequest(*r)
-	if err != nil {
-		err = errs.NewParsingError("Request", err)
-		writeResponseDenied(w, in, err.Error())
+	if err != nil || in == nil {
+		fmt.Println(&errs.UnrecoverableError{
+			Context: "Parsing request in ValidatingWebhookHandler",
+			Err: &errs.ParsingError{
+				Source: "Request",
+				Err:    err,
+			},
+		})
+		return
 	}
 	action := getAction(in.Request)
 
 	verdict := false
-	var message error
+	var message error = nil
 	switch action.(type) {
 	case creationAction:
 		validator, err := NewCreationValidator(wh.Client, r.Context(), in.Request.Object.Raw)
@@ -109,7 +122,12 @@ func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	writeResponseDenied(w, in, message.Error())
+	if message != nil {
+		writeResponseDenied(w, in, message.Error())
+	} else {
+		writeResponseDenied(w, in)
+	}
+
 }
 
 func noPatchResponse(in *admissionv1.AdmissionReview) *admissionv1.AdmissionReview {
