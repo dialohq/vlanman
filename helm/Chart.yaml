@@ -3,14 +3,9 @@ appVersion: 1.16.0
 description: VLAN network manager
 name: vlanman
 type: application
-version: 0.0.0
+version: 0.1.0
 annotations:
   artifacthub.io/category: "networking"
-  artifacthub.io/images: |
-    - name: vlanman
-      image: plan9better/vlanman:0.0.0
-      platforms:
-        - linux/amd64
   artifacthub.io/crds: |
     - kind: VlanNetwork
       version: v1

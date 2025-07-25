@@ -87,6 +87,7 @@
             pkgs.codex
             pkgs.glow
             pkgs.mods
+            pkgs.graphviz
           ];
           shellHook = ''
             go mod tidy

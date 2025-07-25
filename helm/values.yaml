@@ -11,7 +11,7 @@ global:
 controller:
   podTimeoutSeconds: 60
   replicaCount: 1
-  image: "192.168.10.201:5000/vlanman:latest-dev"
+  image: "plan9better/vlanman:0.1.0"
   pullPolicy: Always
   podSecurityContext:
     runAsNonRoot: true
@@ -27,13 +27,13 @@ controller:
   tolerations: []
   affinity: {}
 manager:
-  image: "192.168.10.201:5000/vlan-manager:latest-dev"
+  image: "plan9better/vlan-manager:0.1.0"
   pullPolicy: "Always"
 worker:
-  image: "192.168.10.201:5000/vlan-worker:latest-dev"
+  image: "plan9better/vlan-worker:0.1.0"
   pullPolicy: "Always"
 interface:
-  image: "192.168.10.201:5000/vlan-interface:latest-dev"
+  image: "plan9better/vlan-interface:0.1.0"
   pullPolicy: "Always"
   jobTTLSeconds: 300 # negative values mean never
 # Webhook configuration
