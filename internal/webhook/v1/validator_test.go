@@ -210,7 +210,7 @@ func TestNewCreationValidator(t *testing.T) {
 			Spec: vlanmanv1.VlanNetworkSpec{
 				VlanID:         200,
 				LocalGatewayIP: "192.168.1.1",
-				LocalSubnet:    "192.168.1.0/24",
+				LocalSubnet:    []string{"192.168.1.0/24"},
 			},
 		}
 

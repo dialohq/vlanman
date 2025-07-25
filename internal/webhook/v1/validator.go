@@ -3,12 +3,17 @@ package v1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
+	errs "dialo.ai/vlanman/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -100,7 +105,119 @@ type UpdateValidator struct {
 	NewNetwork *vlanmanv1.VlanNetwork
 }
 
+func NewUpdateValidator(k8s client.Client, ctx context.Context, newObj, oldObj []byte) (*UpdateValidator, error) {
+	allPods := &corev1.PodList{}
+	err := k8s.List(ctx, allPods)
+	if err != nil {
+		return nil, fmt.Errorf("Error listing pods: %w", err)
+	}
+	allNodes := &corev1.NodeList{}
+	err = k8s.List(ctx, allNodes)
+	if err != nil {
+		return nil, fmt.Errorf("Error listing nodes: %w", err)
+	}
+	vlanNetworks := &vlanmanv1.VlanNetworkList{}
+	err = k8s.List(ctx, vlanNetworks)
+	if err != nil {
+		return nil, fmt.Errorf("Error listing VlanNetworks: %w", err)
+	}
+	newVlanNetwork := &vlanmanv1.VlanNetwork{}
+	if err = json.Unmarshal(newObj, newVlanNetwork); err != nil {
+		return nil, fmt.Errorf("Couldn't unmarshal vlan network for Update: %w", err)
+	}
+	oldVlanNetwork := &vlanmanv1.VlanNetwork{}
+	if err = json.Unmarshal(oldObj, oldVlanNetwork); err != nil {
+		return nil, fmt.Errorf("Couldn't unmarshal vlan network for update: %w", err)
+	}
+
+	validator := &Validator{
+		Nodes:    allNodes.Items,
+		Pods:     allPods.Items,
+		Networks: vlanNetworks.Items,
+	}
+	return &UpdateValidator{
+		Validator:  validator,
+		NewNetwork: newVlanNetwork,
+		OldNetwork: oldVlanNetwork,
+	}, nil
+}
+
+func (uv *UpdateValidator) Validate() error {
+	err := uv.validateMinimumNodes(uv.NewNetwork)
+	if err != nil {
+		return fmt.Errorf("Couldn't validate minimum node requirement: %w", err)
+	}
+
+	// don't allow any changes besides pools
+	uv.NewNetwork.Spec.Pools = nil
+	uv.OldNetwork.Spec.Pools = nil
+	if !reflect.DeepEqual(uv.NewNetwork.Spec, uv.OldNetwork.Spec) {
+		return fmt.Errorf("The only field in spec that supports update is 'pools'.")
+	}
+	return nil
+}
+
 type DeletionValidator struct {
 	*Validator
 	DeletedNetwork *vlanmanv1.VlanNetwork
+}
+
+func NewDeletionValidator(k8s client.Client, ctx context.Context, obj []byte) (*DeletionValidator, error) {
+	toDeleteVlanNetwork := &vlanmanv1.VlanNetwork{}
+	if err := json.Unmarshal(obj, toDeleteVlanNetwork); err != nil {
+		return nil, fmt.Errorf("Couldn't unmarshal vlan network for deletion: %w", err)
+	}
+	relevantPods := &corev1.PodList{}
+	req, err := labels.NewRequirement(vlanmanv1.WorkerPodLabelKey, "==", []string{toDeleteVlanNetwork.Name})
+	if err != nil || req == nil {
+		return nil, &errs.InternalError{Context: "Couldn't create a label requirement to list pods in  NewDeletionValidator"}
+	}
+	err = k8s.List(ctx, relevantPods, &client.ListOptions{
+		LabelSelector: labels.NewSelector().Add(*req),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Error listing pods: %w", err)
+	}
+	validator := &Validator{
+		Pods: relevantPods.Items,
+	}
+	return &DeletionValidator{
+		Validator:      validator,
+		DeletedNetwork: toDeleteVlanNetwork,
+	}, nil
+}
+
+var ErrNetInUse error = errors.New("Network is still used by pods")
+
+type NetInUseError struct {
+	Pods []string
+}
+
+func (e *NetInUseError) Error() string {
+	return fmt.Sprintf("Network is still used by %d pods: %s", len(e.Pods), strings.Join(e.Pods, ", "))
+}
+
+func (e *NetInUseError) Unwrap() error {
+	return ErrNetInUse
+}
+
+func (cv *DeletionValidator) validateNotInUse() error {
+	if len(cv.Pods) == 0 {
+		return nil
+	}
+	names := []string{}
+	for _, p := range cv.Pods {
+		s := p.Status.Phase
+		if s == corev1.PodPending || s == corev1.PodRunning {
+			names = append(names, strings.Join([]string{p.Name, p.Namespace}, "@"))
+		}
+	}
+	if len(names) != 0 {
+		return &NetInUseError{Pods: names}
+	}
+	return nil
+}
+
+func (cv *DeletionValidator) Validate() error {
+	return cv.validateNotInUse()
 }

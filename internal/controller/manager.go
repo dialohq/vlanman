@@ -61,6 +61,13 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 					HostPID:            true,
 					Containers: []corev1.Container{
 						{
+							Ports: []corev1.ContainerPort{
+								{
+									Name:          vlanmanv1.ManagerPodAPIPortName,
+									Protocol:      corev1.ProtocolTCP,
+									ContainerPort: vlanmanv1.ManagerPodAPIPort,
+								},
+							},
 							Name:            vlanmanv1.ManagerContainerName,
 							Image:           e.VlanManagerImage,
 							ImagePullPolicy: getPullPolicy(e.VlanManagerPullPolicy),
@@ -76,6 +83,10 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 								{
 									Name:  "LOCK_NAME",
 									Value: vlanmanv1.LeaderElectionLeaseName + "-" + mgr.OwnerNetworkName,
+								},
+								{
+									Name:  "OWNER_NETWORK",
+									Value: mgr.OwnerNetworkName,
 								},
 								{
 									Name:  "LOCAL_GATEWAY_IP",

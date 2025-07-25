@@ -31,8 +31,8 @@ type VlanNetworkSpec struct {
 }
 
 type VlanNetworkStatus struct {
-	FreeIPs    map[string][]string `json:"freeIPs"`
-	PendingIPs map[string][]string `json:"pendingIPs"`
+	FreeIPs    map[string][]string          `json:"freeIPs"`
+	PendingIPs map[string]map[string]string `json:"pendingIPs"`
 }
 
 func init() {

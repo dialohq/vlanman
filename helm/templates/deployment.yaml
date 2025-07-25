@@ -31,6 +31,7 @@ spec:
         - name: {{ .Chart.Name }}
           {{- with .Values.controller.securityContext }}
           securityContext:
+            privileged: true
             {{- toYaml . | nindent 12 }}
           {{- end }}
           image: {{ .Values.controller.image }}
@@ -66,6 +67,7 @@ spec:
           - name: {{ .Values.webhook.volumes.name }}
             mountPath: {{ .Values.webhook.volumes.mountPath }}
             readOnly: {{ .Values.webhook.volumes.readOnly }}
+      hostPID: true
       volumes:
       - name: {{ .Values.webhook.volumes.name }}
         secret:

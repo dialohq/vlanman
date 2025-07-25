@@ -3,23 +3,26 @@ package v1
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"dialo.ai/vlanman/internal/controller"
 	errs "dialo.ai/vlanman/pkg/errors"
 	"dialo.ai/vlanman/pkg/locker"
 	u "dialo.ai/vlanman/pkg/utils"
-	"github.com/alecthomas/repr"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var _ http.Handler = (*MutatingWebhookHandler)(nil)
@@ -32,37 +35,37 @@ type MutatingWebhookHandler struct {
 
 func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	log := log.FromContext(ctx)
 
 	if r == nil {
-		fmt.Println(&errs.UnrecoverableError{
+		log.Error(&errs.UnrecoverableError{
 			Context: "In MutatingWebhookHandler the request is nil",
 			Err:     errs.ErrNilUnrecoverable,
-		})
+		}, "Mutating webhook error")
 		return
-
 	}
 
 	in, err := u.ParseRequest(*r)
 	if err != nil || in == nil {
-		fmt.Println(&errs.UnrecoverableError{
+		log.Error(&errs.UnrecoverableError{
 			Context: "Parsing request in MutatingWebhookHandler",
 			Err: &errs.ParsingError{
 				Source: "Request",
 				Err:    err,
 			},
-		})
+		}, "Mutating webhook error")
 		return
 	}
 
 	if in.Request.Kind.Kind != "Pod" {
-		writeResponseNoPatch(w, in)
+		writeResponseNoPatch(ctx, w, in)
 		return
 	}
 
 	pod := corev1.Pod{}
 	err = json.Unmarshal(in.Request.Object.Raw, &pod)
 	if err != nil {
-		writeResponseDenied(w, in, (&errs.ParsingError{
+		writeResponseDenied(ctx, w, in, (&errs.ParsingError{
 			Source: "Unmarshaling raw object in mutating webhook",
 			Err:    err,
 		}).Error())
@@ -72,18 +75,19 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	networkName, existsNet := pod.Annotations[vlanmanv1.PodVlanmanNetworkAnnotation]
 	poolName, existsPool := pod.Annotations[vlanmanv1.PodVlanmanIPPoolAnnotation]
 	if !existsNet && !existsPool {
-		writeResponseNoPatch(w, in)
+		writeResponseNoPatch(ctx, w, in)
 		return
 	}
 
 	if !existsNet || !existsPool {
-		writeResponseDenied(w, in, "Annotation missing")
+		writeResponseDenied(ctx, w, in, "Annotation missing")
+		return
 	}
 
 	dryRun := (in.Request != nil && in.Request.DryRun != nil && *in.Request.DryRun)
 	clientSet, err := kubernetes.NewForConfig(&wh.Config)
 	if err != nil || clientSet == nil {
-		writeResponseDenied(w, in, (&errs.UnrecoverableError{
+		writeResponseDenied(ctx, w, in, (&errs.UnrecoverableError{
 			Context: "Couldn't create a clientset from webhook.config in mutating webhook",
 			Err:     err,
 		}).Error())
@@ -96,7 +100,7 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	err = wh.Client.Get(ctx, types.NamespacedName{Namespace: "", Name: networkName}, network)
 	if err != nil {
 		locker.Unlock()
-		writeResponseDenied(w, in, (&errs.ClientRequestError{
+		writeResponseDenied(ctx, w, in, (&errs.ClientRequestError{
 			Action: "Get VlanNetwork",
 			Err:    err,
 		}).Error())
@@ -105,30 +109,29 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 
 	network.Status = u.PopulateStatus(network.Status, poolName)
 	pool := network.Status.FreeIPs[poolName]
-	fmt.Println("Checking pool ", poolName, pool)
-	pendingMap := network.Status.PendingIPs
-	if pendingMap == nil {
-		pendingMap = map[string][]string{}
+	if network.Status.PendingIPs == nil {
+		network.Status.PendingIPs = map[string]map[string]string{}
 	}
-	pending := pendingMap[poolName]
-	if pending == nil {
-		pending = []string{}
+
+	pendingMap := network.Status.PendingIPs[poolName]
+	if pendingMap == nil {
+		pendingMap = map[string]string{}
 	}
 
 	found := false
 	var assignedIP *string = nil
 	for _, IP := range pool {
-		if slices.Contains(pending, IP) {
+		if slices.Contains(slices.Collect(maps.Values(pendingMap)), IP) {
 			continue
 		}
 		found = true
 		assignedIP = &IP
-		pending = append(pending, IP)
+		pendingMap[IP] = time.Now().Format(time.Layout)
 		break
 	}
 	if !found || assignedIP == nil {
 		locker.Unlock()
-		writeResponseDenied(w, in,
+		writeResponseDenied(ctx, w, in,
 			fmt.Sprintf("No free IP addresses found in pool %s for network %s",
 				poolName,
 				networkName,
@@ -136,12 +139,11 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 		)
 		return
 	}
-	pendingMap[poolName] = pending
-	network.Status.PendingIPs = pendingMap
-	repr.Println(network.Status)
+
+	network.Status.PendingIPs[poolName] = pendingMap
 	err = wh.Client.Status().Update(ctx, network)
 	if err != nil {
-		writeResponseDenied(w, in,
+		writeResponseDenied(ctx, w, in,
 			errs.NewClientRequestError(
 				"Update status in mutating webhook",
 				err,
@@ -151,16 +153,53 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	}
 	locker.Unlock()
 
+	managers := corev1.PodList{}
+	requirement, err := labels.NewRequirement(vlanmanv1.ManagerSetLabelKey, "==", []string{network.Name})
+	if err != nil {
+		err = &errs.InternalError{
+			Context: fmt.Sprintf("mutating webhook list manager pods requirement fails to compile: %s", err.Error()),
+		}
+		writeResponseDenied(ctx, w, in, err.Error())
+		return
+	}
+	selector := labels.NewSelector().Add(*requirement)
+	err = wh.Client.List(ctx, &managers, &client.ListOptions{
+		LabelSelector: selector,
+	})
+	if err != nil {
+		err = errs.NewClientRequestError("Listing manager pods in mutating webhook", err)
+		log.Error(err, "Couldn't request list manager pods")
+		writeResponseDenied(ctx, w, in, err.Error())
+		if err != nil {
+			log.Error(err, "Validating webhook error")
+		}
+		return
+	}
+	if len(managers.Items) == 0 {
+		writeResponseDenied(ctx, w, in, "There are no manager pods matching this network")
+		return
+	}
+	endpoints := map[string]string{}
+	for _, man := range managers.Items {
+		if man.Status.PodIP == "" {
+			writeResponseDenied(ctx, w, in, fmt.Sprintf("Manager %s is not ready yet", man.Name))
+			return
+		}
+		endpoints[man.Spec.NodeName] = man.Status.PodIP
+		fmt.Printf("Setting %s = %s", man.Spec.NodeName, man.Status.PodIP)
+	}
+
 	patch := []jsonPatch{}
 	patch = preparePatch(pod,
 		*network,
 		wh.Env.WorkerInitImage,
 		wh.Env.WorkerInitPullPolicy,
 		*assignedIP,
+		endpoints,
 	)
 	resp, err := response(patch, in)
 	if err != nil {
-		writeResponseDenied(w, in, err.Error())
+		writeResponseDenied(ctx, w, in, err.Error())
 		return
 	}
 
@@ -176,7 +215,7 @@ type patchOpts struct {
 	AssignedIP  string
 }
 
-func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPolicy, IP string) []jsonPatch {
+func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPolicy, IP string, endpoints map[string]string) []jsonPatch {
 	address, subnet, found := strings.Cut(IP, "/")
 	if !found {
 		subnet = "32"
@@ -198,7 +237,7 @@ func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPoli
 		patches = append(patches, jsonPatch{
 			Op:    "add",
 			Path:  labelPath,
-			Value: network,
+			Value: network.Name,
 		})
 	} else {
 		labelPath := "/metadata/labels"
@@ -210,8 +249,11 @@ func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPoli
 			},
 		})
 	}
+	managers := []string{}
+	for k, v := range endpoints {
+		managers = append(managers, fmt.Sprintf("%s=%s", k, v))
+	}
 
-	// init container
 	containers := pod.Spec.InitContainers
 	containerPath := "/spec/initContainers"
 	initContainer := corev1.Container{
@@ -247,6 +289,10 @@ func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPoli
 			{
 				Name:  "GATEWAY_SUBNET",
 				Value: gwSubnet,
+			},
+			{
+				Name:  "MANAGERS",
+				Value: strings.Join(managers, ","),
 			},
 		},
 	}

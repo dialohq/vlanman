@@ -14,8 +14,10 @@ import (
 	"dialo.ai/vlanman/pkg/comms"
 	errs "dialo.ai/vlanman/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -243,10 +245,62 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		job := interfaceFromDaemon(pod, PID.PID, int(a.Manager.VlanID), r.Env.TTL, r.Env.InterfacePodImage, a.Manager.OwnerNetworkName, r.Env.InterfacePodPullPolicy)
 		err = r.Client.Create(ctx, &job)
 		if err != nil {
-			// TODO: there should be cleanup here as well
-			return &errs.ClientRequestError{
-				Action: "Create job",
-				Err:    err,
+			if apierrors.IsAlreadyExists(err) {
+				existingJob := batchv1.Job{}
+				err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+				if err != nil {
+					return errs.NewClientRequestError("Get conflicting job", err)
+				}
+				// wait for job to complete
+				tries := 1
+				for existingJob.Status.Active != 0 && tries <= 30 {
+					log.Info("Waiting for conflicting job to finish", "job", existingJob.Name, "activeItems", existingJob.Status.Active, "tries", fmt.Sprintf("%d/%d", tries, 30))
+					time.Sleep(time.Second)
+					err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+					if err != nil {
+						return errs.NewClientRequestError("Get conflicting job", err)
+					}
+					tries += 1
+				}
+				log.Info("Deleting conflicting job", "job", existingJob.Name)
+				// Delete pods created by this job as well
+				pp := metav1.DeletePropagationBackground
+				err = r.Client.Delete(ctx, &existingJob, &client.DeleteOptions{
+					PropagationPolicy: &pp,
+				})
+				if err != nil {
+					return errs.NewClientRequestError("Delete conflicting job after it finished", err)
+				}
+				err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+				if err != nil && !apierrors.IsNotFound(err) {
+					return errs.NewClientRequestError("Get conflicting job", err)
+				}
+
+				jobDeleted := apierrors.IsNotFound(err)
+				tries = 0
+				for !jobDeleted && tries <= 30 {
+					log.Info("Waiting for conflicting job to delete", "job", existingJob.Name, "activeItems", existingJob.Status.Active, "tries", fmt.Sprintf("%d/%d", tries, 30))
+					time.Sleep(time.Second)
+					err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+					if err != nil && !apierrors.IsNotFound(err) {
+						return errs.NewClientRequestError("Get conflicting job while waiting for delete", err)
+					}
+					if apierrors.IsNotFound(err) {
+						jobDeleted = true
+					}
+					tries += 1
+				}
+				log.Info("Conflicting job deleted successfully, trying to create again...")
+				err = r.Client.Create(ctx, &job)
+				if err != nil {
+					return errs.NewClientRequestError("Create job after deleting conflicting one", err)
+				}
+			} else {
+				// TODO: there should be cleanup here as well
+				return &errs.ClientRequestError{
+					Action: "Create job",
+					Err:    err,
+				}
 			}
 		}
 		resp, err = http.Get(fmt.Sprintf("http://%s:61410", pod.Status.PodIP))
@@ -262,7 +316,8 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 				Err:    fmt.Errorf("Response is nil"),
 			}
 		}
-		for resp.StatusCode != 200 && timeout <= vlanmanv1.WaitForDaemonTimeout {
+		tries = 0
+		for resp.StatusCode != 200 && tries <= vlanmanv1.WaitForDaemonTimeout {
 			triesString := fmt.Sprintf("%d/%d", tries, vlanmanv1.WaitForDaemonTimeout)
 			log.Info("Waiting for pod to return ready (200)", "received", resp.StatusCode, "tries", triesString)
 			resp, err = http.Get(fmt.Sprintf("http://%s:61410/ready", pod.Status.PodIP))
@@ -303,7 +358,7 @@ func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 
 	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
 	err = r.Client.Delete(ctx, &svc)
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return &errs.ClientRequestError{
 			Action: "Delete service",
 			Err:    err,

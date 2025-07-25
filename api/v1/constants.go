@@ -35,4 +35,12 @@ const (
 	WebhookServerPort = 8443
 	// WebhookServerCertDir is the directory path for webhook server certificates
 	WebhookServerCertDir = "/etc/webhook/certs"
+	// ManagerPodAPIPort is the port on which manager pod is listening
+	ManagerPodAPIPort = 61410
+	// ManagerPodAPIPortName is the port on which manager pod is listening
+	ManagerPodAPIPortName = "api"
+	// PodMonitorName is the name that will be given to the pod monitor if monitoring is enabled
+	PodMonitorName                     = "vlanman-pod-monitor"
+	ReconcilerPendingIPsTimeoutSeconds = 35
+	UpdateStatusMaxRetries             = 5
 )

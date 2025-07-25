@@ -1,0 +1,1 @@
+ls | get name | each {|it| let new = ($it | str replace "01" "02"); cp $it $new  }

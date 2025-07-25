@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"regexp"
@@ -15,7 +14,6 @@ import (
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	errs "dialo.ai/vlanman/pkg/errors"
-	ip "github.com/vishvananda/netlink"
 
 	admissionv1 "k8s.io/api/admission/v1"
 )
@@ -118,7 +116,7 @@ func GetCallerInfo() CallerInfo {
 
 func PopulateStatus(status vlanmanv1.VlanNetworkStatus, poolNames ...string) vlanmanv1.VlanNetworkStatus {
 	if status.PendingIPs == nil {
-		status.PendingIPs = map[string][]string{}
+		status.PendingIPs = map[string]map[string]string{}
 	}
 	if status.FreeIPs == nil {
 		status.FreeIPs = map[string][]string{}
@@ -129,32 +127,6 @@ func PopulateStatus(status vlanmanv1.VlanNetworkStatus, poolNames ...string) vla
 		}
 	}
 	return status
-}
-
-func FindDefaultInterface() (*ip.Link, error) {
-	_, dflt, err := net.ParseCIDR("0.0.0.0/0")
-	if err != nil {
-		return nil, fmt.Errorf("error parsing CIDR: %s", err.Error())
-	}
-	links, err := ip.LinkList()
-	if err != nil {
-		return nil, fmt.Errorf("error listing links: %s", err.Error())
-	}
-	for _, l := range links {
-		routes, err := ip.RouteList(l, ip.FAMILY_V4)
-		if err != nil {
-			return nil, fmt.Errorf("error listing routes for device %s: %s", l.Attrs().Name, err.Error())
-		}
-		if len(routes) == 0 {
-			continue
-		}
-		for _, r := range routes {
-			if r.Dst.String() == dflt.String() {
-				return &l, nil
-			}
-		}
-	}
-	return nil, fmt.Errorf("Default route not found")
 }
 
 func IpToByteArray(ip string) ([]byte, error) {

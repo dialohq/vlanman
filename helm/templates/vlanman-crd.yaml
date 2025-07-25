@@ -60,9 +60,10 @@ spec:
                 pendingIPs:
                   type: object
                   additionalProperties:
-                    type: array
-                    items:
+                    type: object
+                    additionalProperties:
                       type: string
+
 
       subresources:
         status: {}

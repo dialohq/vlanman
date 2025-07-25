@@ -18,10 +18,10 @@ controller:
     seccompProfile:
       type: RuntimeDefault
   securityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
   resources: {}
   nodeSelector: {}
   tolerations: []

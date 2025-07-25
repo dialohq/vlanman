@@ -1,13 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 	"sync/atomic"
 	"time"
 
 	ip "github.com/vishvananda/netlink"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type VlanWatcher struct {
@@ -47,7 +47,7 @@ func (v *VlanWatcher) Watch() error {
 				}
 				v.UP.Store(true)
 				v.Link = link
-				fmt.Println("Vlan found")
+				log.Log.Info("VLAN interface found", "name", ifaceName)
 				return nil
 			}
 		}

@@ -16,6 +16,5 @@ type MacvlanRequest struct {
 }
 
 type MacvlanResponse struct {
-	Ok  bool  `json:"ok"`
-	Err error `json:"err"`
+	Id int `json:"vlan_id"`
 }

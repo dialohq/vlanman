@@ -4,29 +4,37 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"dialo.ai/vlanman/pkg/comms"
 	errs "dialo.ai/vlanman/pkg/errors"
+	"github.com/go-logr/logr"
 	ip "github.com/vishvananda/netlink"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+var log logr.Logger = zap.New()
+
 func fatal(err error) {
-	fmt.Println(err)
+	log.Error(err, "Fatal error in worker")
 	os.Exit(1)
+}
+
+func isAlreadyExists(e error) bool {
+	return strings.Contains(e.Error(), "file exists")
 }
 
 func main() {
 	networkName := os.Getenv("VLAN_NETWORK")
 	url := fmt.Sprintf("http://%s-service.vlanman-system:61410/macvlan", networkName)
 
-	cmd := exec.Command("bash", "-c", "readlink /proc/1/ns/net | grep -o '[0-9]\\+'")
+	cmd := exec.Command("bash", "-c", "readlink /proc/$$/ns/net | grep -o '[0-9]\\+'")
 	nsidStr, err := cmd.Output()
 	if err != nil {
 		exErr, ok := err.(*exec.ExitError)
@@ -77,17 +85,34 @@ func main() {
 			Err:     errs.ErrUnrecoverable,
 		})
 	}
-	link, err := ip.LinkByName("macvlan0")
+	out, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fatal(&errs.ParsingError{
+			Source: "Response body of request for macvlan",
+			Err:    err,
+		})
+	}
+	mvrd := &comms.MacvlanResponse{}
+	err = json.Unmarshal(out, mvrd)
+	if err != nil {
+		fatal(&errs.ParsingError{
+			Source: "Unmarshaling macvlan response data",
+			Err:    err,
+		})
+	}
+
+	linkName := "macvlan" + strconv.FormatInt(int64(mvrd.Id), 10)
+	link, err := ip.LinkByName(linkName)
 	if err != nil {
 		fatal(&errs.UnrecoverableError{
-			Context: fmt.Sprintf("Couldn't get link by name '%s'", "macvlan0"),
+			Context: fmt.Sprintf("Couldn't get link by name '%s'", linkName),
 			Err:     err,
 		})
 	}
 	err = ip.LinkSetUp(link)
 	if err != nil {
 		fatal(&errs.UnrecoverableError{
-			Context: fmt.Sprintf("Couldn't set link '%s' up", "macvlan0"),
+			Context: fmt.Sprintf("Couldn't set link '%s' up", linkName),
 			Err:     err,
 		})
 	}
@@ -103,7 +128,7 @@ func main() {
 	}
 	addr := ip.Addr{IPNet: &ipnet}
 	err = ip.AddrAdd(link, &addr)
-	if err != nil {
+	if err != nil && !isAlreadyExists(err) {
 		fatal(&errs.UnrecoverableError{
 			Context: "Failed to add IP address to macvlan",
 			Err:     err,
@@ -131,20 +156,19 @@ func main() {
 			Dst:       gwIPNet,
 		}
 		err = ip.RouteAdd(&gwRoute)
-		if err != nil {
+		if err != nil && !isAlreadyExists(err) {
 			fatal(&errs.UnrecoverableError{
 				Context: "Failed to add route to remote gateway",
 				Err:     err,
 			})
 		}
 	}
-
 	routes := strings.SplitSeq(os.Getenv("REMOTE_ROUTES"), ",")
 	for r := range routes {
 		_, ipnet, err := net.ParseCIDR(r)
 		if err != nil {
 			fatal(&errs.UnrecoverableError{
-				Context: fmt.Sprintf("Failed to add route to remote '%s'", r),
+				Context: fmt.Sprintf("Failed to parse route to remote '%s'", r),
 				Err:     err,
 			})
 		}
@@ -162,19 +186,12 @@ func main() {
 			}
 		}
 		err = ip.RouteAdd(&route)
-		if err != nil {
-			fmt.Println(&errs.UnrecoverableError{
-				Context: fmt.Sprintf("Failed to add route to remote '%s'", r),
-				Err:     err,
-			})
-			for {
-				time.Sleep(time.Second)
-			}
+		if err != nil && !strings.Contains(strings.ToLower(err.Error()), "file exists") {
 			fatal(&errs.UnrecoverableError{
 				Context: fmt.Sprintf("Failed to add route to remote '%s'", r),
 				Err:     err,
 			})
 		}
 	}
-	fmt.Println("All done")
+	log.Info("Worker completed successfully")
 }

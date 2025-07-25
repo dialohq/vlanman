@@ -1,8 +1,0 @@
-apiVersion: kuttl.dev/v1beta1
-kind: TestSuite
-metadata:
-  name: vlanman-e2e
-spec:
-  timeout: 30
-  parallel: 2
-  skipDelete: false

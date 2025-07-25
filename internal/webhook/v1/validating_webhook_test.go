@@ -165,8 +165,8 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 			Spec: vlanmanv1.VlanNetworkSpec{
 				VlanID:         200,
 				LocalGatewayIP: "192.168.1.1",
-				LocalSubnet:    "192.168.1.0/24",
-				RemoteSubnet:   "192.168.2.0/24",
+				LocalSubnet:    []string{"192.168.1.0/24"},
+				RemoteSubnet:   []string{"192.168.2.0/24"},
 				ExcludedNodes:  []string{},
 			},
 		}
@@ -215,8 +215,8 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 			Spec: vlanmanv1.VlanNetworkSpec{
 				VlanID:         100, // Same as existing network
 				LocalGatewayIP: "192.168.1.1",
-				LocalSubnet:    "192.168.1.0/24",
-				RemoteSubnet:   "192.168.2.0/24",
+				LocalSubnet:    []string{"192.168.1.0/24"},
+				RemoteSubnet:   []string{"192.168.2.0/24"},
 				ExcludedNodes:  []string{},
 			},
 		}
@@ -266,8 +266,8 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 			Spec: vlanmanv1.VlanNetworkSpec{
 				VlanID:         300,
 				LocalGatewayIP: "192.168.1.1",
-				LocalSubnet:    "192.168.1.0/24",
-				RemoteSubnet:   "192.168.2.0/24",
+				LocalSubnet:    []string{"192.168.1.0/24"},
+				RemoteSubnet:   []string{"192.168.2.0/24"},
 				ExcludedNodes:  []string{"node1", "node2"}, // Exclude all nodes
 			},
 		}

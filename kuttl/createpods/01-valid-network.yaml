@@ -1,0 +1,15 @@
+apiVersion: vlanman.dialo.ai/v1
+kind: VlanNetwork
+metadata:
+  name: netwithpods1
+spec:
+  vlanId: 110
+  localGatewayIp: "192.168.100.1"
+  localSubnet: ["192.168.100.0/24"]
+  remoteSubnet: ["192.168.200.0/24"]
+  pools:
+    primary:
+      - "192.168.100.10"
+      - "192.168.100.11"
+      - "192.168.100.12"
+  excludedNodes: []

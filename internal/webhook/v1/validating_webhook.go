@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type ValidatingWebhookHandler struct {
@@ -28,24 +30,26 @@ type (
 	unknownAction  struct{}
 )
 
-func writeResponseNoPatch(w http.ResponseWriter, in *admissionv1.AdmissionReview) {
+func writeResponseNoPatch(ctx context.Context, w http.ResponseWriter, in *admissionv1.AdmissionReview) {
+	logger := log.FromContext(ctx)
 	w.Header().Add("Content-Type", "application/json")
 	r := noPatchResponse(in)
 	rjson, err := json.Marshal(r)
 	if err != nil {
-		fmt.Println("Error marshalling response for no patch: ", err)
-		return
+		err = errs.NewParsingError("Marshalling no patch response in validating webhook", err)
+		logger.Error(err, "Error writing no patch response in validating webhook")
 	}
 	w.Write(rjson)
 }
 
-func writeResponseDenied(w http.ResponseWriter, in *admissionv1.AdmissionReview, reason ...string) {
+func writeResponseDenied(ctx context.Context, w http.ResponseWriter, in *admissionv1.AdmissionReview, reason ...string) {
+	logger := log.FromContext(ctx)
 	w.Header().Add("Content-Type", "application/json")
 	r := deniedResponse(in, reason...)
 	rjson, err := json.Marshal(r)
 	if err != nil {
-		fmt.Println("Error marshalling response for denied: ", err)
-		return
+		err = errs.NewParsingError("Marshalling denied response in validating webhook", err)
+		logger.Error(err, "Error writing denied response in validating webhook")
 	}
 	w.Write(rjson)
 }
@@ -68,48 +72,69 @@ func getAction(req *admissionv1.AdmissionRequest) any {
 
 func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r == nil {
-		fmt.Println(&errs.UnrecoverableError{
+		fmt.Println("Validating webhook error", &errs.UnrecoverableError{
 			Context: "In ValidatingWebhookHandler the request is nil",
 			Err:     errs.ErrNilUnrecoverable,
 		})
 		return
 	}
+	ctx := r.Context()
+	log := log.FromContext(ctx)
+
 	in, err := u.ParseRequest(*r)
 	if err != nil || in == nil {
-		fmt.Println(&errs.UnrecoverableError{
+		log.Error(&errs.UnrecoverableError{
 			Context: "Parsing request in ValidatingWebhookHandler",
 			Err: &errs.ParsingError{
 				Source: "Request",
 				Err:    err,
 			},
-		})
+		}, "Validating webhook error")
 		return
 	}
 	action := getAction(in.Request)
 
-	verdict := false
+	allow := false
 	var message error = nil
 	switch action.(type) {
 	case creationAction:
 		validator, err := NewCreationValidator(wh.Client, r.Context(), in.Request.Object.Raw)
 		if err != nil {
-			writeResponseDenied(w, in, fmt.Sprintf("Couldn't create a validator: %s", err.Error()))
+			writeResponseDenied(ctx, w, in, fmt.Sprintf("Couldn't create a validator: %s", err.Error()))
 			return
 		}
 		err = validator.Validate()
 		if err != nil {
 			message = err
 		} else {
-			verdict = true
+			allow = true
 		}
 
 	case deletionAction:
-		// message = &errs.UnimplementedError{Feature: "Deletion"}
-		writeResponseNoPatch(w, in)
-		return
+		validator, err := NewDeletionValidator(wh.Client, ctx, in.Request.OldObject.Raw)
+		if err != nil {
+			writeResponseDenied(ctx, w, in, fmt.Sprintf("Couldn't create a validator: %s", err.Error()))
+			return
+		}
+		err = validator.Validate()
+		if err != nil {
+			message = err
+		} else {
+			allow = true
+		}
 
 	case updateAction:
-		message = &errs.UnimplementedError{Feature: "Update"}
+		validator, err := NewUpdateValidator(wh.Client, r.Context(), in.Request.Object.Raw, in.Request.OldObject.Raw)
+		if err != nil {
+			writeResponseDenied(ctx, w, in, fmt.Sprintf("Couldn't create a validator: %s", err.Error()))
+			return
+		}
+		err = validator.Validate()
+		if err != nil {
+			message = err
+		} else {
+			allow = true
+		}
 
 	default:
 		message = &errs.InternalError{
@@ -117,17 +142,16 @@ func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	if verdict {
-		writeResponseNoPatch(w, in)
+	if allow {
+		writeResponseNoPatch(ctx, w, in)
 		return
 	}
 
 	if message != nil {
-		writeResponseDenied(w, in, message.Error())
+		writeResponseDenied(ctx, w, in, message.Error())
 	} else {
-		writeResponseDenied(w, in)
+		writeResponseDenied(ctx, w, in, "empty message")
 	}
-
 }
 
 func noPatchResponse(in *admissionv1.AdmissionReview) *admissionv1.AdmissionReview {

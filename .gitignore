@@ -2,3 +2,4 @@ result
 samples
 kubeconfig
 .direnv
+.helix

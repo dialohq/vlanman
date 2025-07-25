@@ -4,10 +4,23 @@ metadata:
   name: net2
 spec:
   excludedNodes: []
-  gatewayIp: "192.168.100.2"
-  localSubnet: "192.168.200.0/24"
-  remoteSubnet: "192.168.300.0/24"
   vlanId: 200
+  localGatewayIp: "192.168.100.2"
+  localSubnet:
+    - "192.168.200.0/24"
+  remoteSubnet:
+    - "192.168.30.0/24"
+  pools:
+    primary:
+      - "192.168.200.10"
+      - "192.168.200.11"
+      - "192.168.200.12"
+status:
+  freeIPs:
+    primary:
+      - "192.168.200.10"
+      - "192.168.200.11"
+      - "192.168.200.12"
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -23,6 +36,20 @@ spec:
         - env:
             - name: VLAN_ID
               value: "200"
+            - name: NAMESPACE
+              value: vlanman-system
+            - name: LOCK_NAME
+              value: vlanman-leader-election-net2
+            - name: OWNER_NETWORK
+              value: net2
+            - name: LOCAL_GATEWAY_IP
+              value: 192.168.100.2
+            - name: LOCAL_GATEWAY_SUBNET
+              value: "32"
+            - name: REMOTE_ROUTES
+              value: 192.168.30.0/24
+            - name: LOCAL_ROUTES
+              value: 192.168.200.0/24
           image: 192.168.10.201:5000/vlan-manager:latest-dev
           name: vlan-manager
           securityContext:
@@ -42,15 +69,15 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    job-name: create-vlan-job-net2-nixos
-  name: create-vlan-job-net2-nixos
+    job-name: create-vlan-job-net2-k3s-1
+  name: create-vlan-job-net2-k3s-1
   namespace: vlanman-system
 spec:
   template:
     metadata:
       labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net2-nixos
-        job-name: create-vlan-job-net2-nixos
+        batch.kubernetes.io/job-name: create-vlan-job-net2-k3s-1
+        job-name: create-vlan-job-net2-k3s-1
     spec:
       containers:
         - env:
@@ -68,7 +95,7 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        kubernetes.io/hostname: nixos
+        kubernetes.io/hostname: k3s-1
 status:
   ready: 0
   succeeded: 1
@@ -78,15 +105,15 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    job-name: create-vlan-job-net2-nixos2
-  name: create-vlan-job-net2-nixos2
+    job-name: create-vlan-job-net2-k3s-2
+  name: create-vlan-job-net2-k3s-2
   namespace: vlanman-system
 spec:
   template:
     metadata:
       labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net2-nixos2
-        job-name: create-vlan-job-net2-nixos2
+        batch.kubernetes.io/job-name: create-vlan-job-net2-k3s-2
+        job-name: create-vlan-job-net2-k3s-2
     spec:
       containers:
         - env:
@@ -104,7 +131,7 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        kubernetes.io/hostname: nixos2
+        kubernetes.io/hostname: k3s-2
 status:
   ready: 0
   succeeded: 1
@@ -116,10 +143,23 @@ metadata:
   name: net1
 spec:
   excludedNodes: []
-  gatewayIp: "192.168.100.1"
-  localSubnet: "192.168.100.0/24"
-  remoteSubnet: "192.168.200.0/24"
+  localGatewayIp: "192.168.100.1"
+  localSubnet:
+    - "192.168.100.0/24"
+  pools:
+    primary:
+      - 192.168.100.10
+      - 192.168.100.11
+      - 192.168.100.12
+  remoteSubnet:
+    - "192.168.200.0/24"
   vlanId: 100
+status:
+  freeIPs:
+    primary:
+      - 192.168.100.10
+      - 192.168.100.11
+      - 192.168.100.12
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -135,6 +175,20 @@ spec:
         - env:
             - name: VLAN_ID
               value: "100"
+            - name: NAMESPACE
+              value: "vlanman-system"
+            - name: LOCK_NAME
+              value: vlanman-leader-election-net1
+            - name: OWNER_NETWORK
+              value: net1
+            - name: LOCAL_GATEWAY_IP
+              value: 192.168.100.1
+            - name: LOCAL_GATEWAY_SUBNET
+              value: "32"
+            - name: REMOTE_ROUTES
+              value: 192.168.200.0/24
+            - name: LOCAL_ROUTES
+              value: 192.168.100.0/24
           image: 192.168.10.201:5000/vlan-manager:latest-dev
           name: vlan-manager
           securityContext:
@@ -154,15 +208,15 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    job-name: create-vlan-job-net1-nixos
-  name: create-vlan-job-net1-nixos
+    job-name: create-vlan-job-net1-k3s-1
+  name: create-vlan-job-net1-k3s-1
   namespace: vlanman-system
 spec:
   template:
     metadata:
       labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net1-nixos
-        job-name: create-vlan-job-net1-nixos
+        batch.kubernetes.io/job-name: create-vlan-job-net1-k3s-1
+        job-name: create-vlan-job-net1-k3s-1
     spec:
       containers:
         - env:
@@ -180,7 +234,7 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        kubernetes.io/hostname: nixos
+        kubernetes.io/hostname: k3s-1
 status:
   ready: 0
   succeeded: 1
@@ -190,15 +244,15 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   labels:
-    job-name: create-vlan-job-net1-nixos2
-  name: create-vlan-job-net1-nixos2
+    job-name: create-vlan-job-net1-k3s-2
+  name: create-vlan-job-net1-k3s-2
   namespace: vlanman-system
 spec:
   template:
     metadata:
       labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net1-nixos2
-        job-name: create-vlan-job-net1-nixos2
+        batch.kubernetes.io/job-name: create-vlan-job-net1-k3s-2
+        job-name: create-vlan-job-net1-k3s-2
     spec:
       containers:
         - env:
@@ -216,7 +270,7 @@ spec:
       hostNetwork: true
       hostPID: true
       nodeSelector:
-        kubernetes.io/hostname: nixos2
+        kubernetes.io/hostname: k3s-2
 status:
   ready: 0
   succeeded: 1

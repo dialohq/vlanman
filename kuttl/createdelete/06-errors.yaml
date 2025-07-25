@@ -11,22 +11,6 @@ metadata:
   labels:
     vlanman.dialo.ai/manager: net2
 ---
-apiVersion: batch/v1
-kind: Job
-metadata:
-  labels:
-    job-name: create-vlan-job-net2-nixos
-  name: create-vlan-job-net2-nixos
-  namespace: vlanman-system
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  labels:
-    job-name: create-vlan-job-net2-nixos2
-  name: create-vlan-job-net2-nixos2
-  namespace: vlanman-system
----
 apiVersion: v1
 kind: Service
 metadata:
