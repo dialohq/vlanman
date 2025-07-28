@@ -20,7 +20,7 @@ entries:
       name: vlanman
       type: application
       urls:
-        - https://github.com/dialohq/ipman/releases/download/v0.1.1/vlanman-0.1.1.tgz
+        - https://github.com/dialohq/vlanman/releases/download/v0.1.1/vlanman-0.1.1.tgz
       version: 0.1.1
     - annotations:
         artifacthub.io/category: networking
@@ -41,6 +41,6 @@ entries:
       name: vlanman
       type: application
       urls:
-        - https://github.com/dialohq/ipman/releases/download/v0.1.0/vlanman-0.1.0.tgz
+        - https://github.com/dialohq/vlanman/releases/download/v0.1.0/vlanman-0.1.0.tgz
       version: 0.1.0
 generated: "2025-07-28T15:24:59.991244+02:00"
