@@ -4,14 +4,16 @@ metadata:
   name: net4
 spec:
   vlanId: 400
-  localGatewayIp: "192.168.100.4"
   localSubnet:
     - "192.168.40.0/24"
   remoteSubnet:
     - "192.168.50.0/24"
   pools:
-    primary:
-      - "192.168.40.10"
-      - "192.168.40.11"
-      - "192.168.40.12"
+    - name: primary
+      description: "Primary IP pool"
+      addresses:
+        - "192.168.40.10"
+        - "192.168.40.11"
+        - "192.168.40.12"
+  localGatewayIp: "192.168.100.4"
   excludedNodes: ["k3s-2"]

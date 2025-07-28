@@ -22,19 +22,18 @@ spec:
               type: object
               properties:
                 pools:
-                  type: object
-                  additionalProperties:
-                    type: array
-                    items:
-                      type: string
-                localGatewayIp:
-                  type: string
-                remoteGatewayIp:
-                  type: string
-                excludedNodes:
                   type: array
                   items:
-                    type: string
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      description:
+                        type: string
+                      addresses:
+                        type: array
+                        items:
+                          type: string
                 localSubnet:
                   type: array
                   items:
@@ -45,8 +44,17 @@ spec:
                     type: string
                 vlanId:
                   type: integer
+                localGatewayIp:
+                  type: string
+                remoteGatewayIp:
+                  type: string
+                excludedNodes:
+                  type: array
+                  items:
+                    type: string
               required:
                 - remoteSubnet
+                - localSubnet
                 - vlanId
             status:
               type: object

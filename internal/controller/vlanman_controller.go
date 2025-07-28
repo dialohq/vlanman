@@ -230,6 +230,12 @@ func extractVlan(pod corev1.Pod) (string, bool) {
 	return fullIp, ip != ""
 }
 
+func poolName(name string) func(vlanmanv1.VlanNetworkPool) bool {
+	return func(p vlanmanv1.VlanNetworkPool) bool {
+		return name == p.Name
+	}
+}
+
 func (r *VlanmanReconciler) updateVlanNetworkStatus(ctx context.Context, net *vlanmanv1.VlanNetwork) (*time.Duration, error) {
 	if net.Status.FreeIPs == nil {
 		net.Status.FreeIPs = map[string][]string{}
@@ -238,25 +244,24 @@ func (r *VlanmanReconciler) updateVlanNetworkStatus(ctx context.Context, net *vl
 		net.Status.PendingIPs = map[string]map[string]string{}
 	}
 
-	for k := range net.Status.FreeIPs {
-		if _, ok := net.Spec.Pools[k]; !ok {
-			delete(net.Status.FreeIPs, k)
-			delete(net.Status.PendingIPs, k)
+	for name := range net.Status.FreeIPs {
+		if !slices.ContainsFunc(net.Spec.Pools, poolName(name)) {
+			delete(net.Status.FreeIPs, name)
+			delete(net.Status.PendingIPs, name)
 		}
 	}
 
-	for poolName, p := range net.Spec.Pools {
-		if net.Status.FreeIPs[poolName] == nil {
-			net.Status.FreeIPs[poolName] = []string{}
+	for _, pool := range net.Spec.Pools {
+		if net.Status.FreeIPs[pool.Name] == nil {
+			net.Status.FreeIPs[pool.Name] = []string{}
 		}
-		net.Status.FreeIPs[poolName] = slices.Clone(p)
+		net.Status.FreeIPs[pool.Name] = slices.Clone(pool.Addresses)
 
-		if net.Status.PendingIPs[poolName] == nil {
-			net.Status.PendingIPs[poolName] = map[string]string{}
+		if net.Status.PendingIPs[pool.Name] == nil {
+			net.Status.PendingIPs[pool.Name] = map[string]string{}
 		}
 	}
 
-	// TODO make it use labels and label selector or wahtever
 	podlist := &corev1.PodList{}
 	requirement, err := labels.NewRequirement(vlanmanv1.WorkerPodLabelKey, "==", []string{net.Name})
 	if err != nil {

@@ -4,15 +4,17 @@ metadata:
   name: netwithpods1
 spec:
   excludedNodes: []
-  localGatewayIp: "192.168.100.1"
   localSubnet: ["192.168.100.0/24"]
   remoteSubnet: ["192.168.200.0/24"]
   vlanId: 110
   pools:
-    primary:
-      - "192.168.100.10"
-      - "192.168.100.11"
-      - "192.168.100.12"
+    - name: primary
+      description: "Primary IP pool"
+      addresses:
+        - "192.168.100.10"
+        - "192.168.100.11"
+        - "192.168.100.12"
+  localGatewayIp: "192.168.100.1"
 status:
   freeIPs:
     primary:

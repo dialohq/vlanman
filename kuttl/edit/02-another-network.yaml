@@ -4,12 +4,14 @@ metadata:
   name: neteditable2
 spec:
   vlanId: 130
-  localGatewayIp: "192.168.100.2"
   localSubnet:
     - "192.168.30.0/24"
   remoteSubnet:
     - "192.168.40.0/24"
   pools:
-    primary:
-      - "192.168.30.10"
+    - name: primary
+      description: "Primary IP pool"
+      addresses:
+        - "192.168.30.10"
+  localGatewayIp: "192.168.100.2"
   excludedNodes: []

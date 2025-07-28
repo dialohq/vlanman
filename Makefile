@@ -1,4 +1,4 @@
-VERSION ?= 0.0.0
+VERSION ?= 0.1.1
 DOCKERHUB_USER ?= plan9better
 LOCAL_REGISTRY ?= 192.168.10.201:5000
 
@@ -29,6 +29,20 @@ test:
 
 	docker build -t $(LOCAL_REGISTRY)/vlan-interface:latest-dev --platform linux/amd64 --file ./interface.Dockerfile --build-arg PLATFORM=amd64 .
 	docker push $(LOCAL_REGISTRY)/vlan-interface:latest-dev 
+
+test-local:
+	docker build -t $(LOCAL_REGISTRY)/vlanman:$(VERSION) --platform linux/arm64 --file ./operator.Dockerfile --build-arg PLATFORM=arm64 .
+	docker push $(LOCAL_REGISTRY)/vlanman:$(VERSION) 
+
+	docker build -t $(LOCAL_REGISTRY)/vlan-manager:$(VERSION) --platform linux/arm64 --file ./manager.Dockerfile --build-arg PLATFORM=arm64 .
+	docker push $(LOCAL_REGISTRY)/vlan-manager:$(VERSION) 
+
+	docker build -t $(LOCAL_REGISTRY)/vlan-worker:$(VERSION) --platform linux/arm64 --file ./worker.Dockerfile --build-arg PLATFORM=arm64 .
+	docker push $(LOCAL_REGISTRY)/vlan-worker:$(VERSION) 
+
+	docker build -t $(LOCAL_REGISTRY)/vlan-interface:$(VERSION) --platform linux/arm64 --file ./interface.Dockerfile --build-arg PLATFORM=arm64 .
+	docker push $(LOCAL_REGISTRY)/vlan-interface:$(VERSION) 
+
 
 vlanman:
 	docker build -t $(LOCAL_REGISTRY)/vlanman:latest-dev --platform linux/arm64 --file ./operator.Dockerfile .

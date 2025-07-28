@@ -5,16 +5,18 @@ metadata:
 spec:
   excludedNodes: []
   vlanId: 200
-  localGatewayIp: "192.168.100.2"
   localSubnet:
     - "192.168.200.0/24"
   remoteSubnet:
     - "192.168.30.0/24"
   pools:
-    primary:
-      - "192.168.200.10"
-      - "192.168.200.11"
-      - "192.168.200.12"
+    - name: primary
+      description: "Primary IP pool"
+      addresses:
+        - "192.168.200.10"
+        - "192.168.200.11"
+        - "192.168.200.12"
+  localGatewayIp: "192.168.100.2"
 status:
   freeIPs:
     primary:
@@ -143,17 +145,19 @@ metadata:
   name: net1
 spec:
   excludedNodes: []
-  localGatewayIp: "192.168.100.1"
   localSubnet:
     - "192.168.100.0/24"
   pools:
-    primary:
-      - 192.168.100.10
-      - 192.168.100.11
-      - 192.168.100.12
+    - name: primary
+      description: "Primary IP pool"
+      addresses:
+        - "192.168.100.10"
+        - "192.168.100.11"
+        - "192.168.100.12"
   remoteSubnet:
     - "192.168.200.0/24"
   vlanId: 100
+  localGatewayIp: "192.168.100.1"
 status:
   freeIPs:
     primary:

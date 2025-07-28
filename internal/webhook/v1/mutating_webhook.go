@@ -186,7 +186,6 @@ func (wh *MutatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		endpoints[man.Spec.NodeName] = man.Status.PodIP
-		fmt.Printf("Setting %s = %s", man.Spec.NodeName, man.Status.PodIP)
 	}
 
 	patch := []jsonPatch{}

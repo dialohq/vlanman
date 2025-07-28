@@ -4,17 +4,19 @@ metadata:
   name: net3
 spec:
   excludedNodes: ["k3s-1"]
-  localGatewayIp: "192.168.100.3"
   localSubnet:
     - "192.168.30.0/24"
   remoteSubnet:
     - "192.168.40.0/24"
   pools:
-    primary:
-      - "192.168.30.10"
-      - "192.168.30.11"
-      - "192.168.30.12"
+    - name: primary
+      description: "Primary IP pool"
+      addresses:
+        - "192.168.30.10"
+        - "192.168.30.11"
+        - "192.168.30.12"
   vlanId: 300
+  localGatewayIp: "192.168.100.3"
 ---
 apiVersion: apps/v1
 kind: DaemonSet

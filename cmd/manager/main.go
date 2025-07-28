@@ -332,14 +332,13 @@ func getEnvs() Envs {
 func getValues() (int64, *time.Time) {
 	cnt := leaderChanges.Load()
 
-	val, ok := lastLeaderChange.Load().(time.Time)
+	val := lastLeaderChange.Load()
+	change, ok := val.(time.Time)
 	if !ok {
-		panic("Last leader change metric is not of type time.Time")
-	}
-	if time.Unix(0, 0).Equal(val) {
 		return cnt, nil
+		// panic("Last leader change metric is not of type time.Time")
 	}
-	return cnt, &val
+	return cnt, &change
 }
 
 func interfaceSetup(ctx context.Context, e Envs) {

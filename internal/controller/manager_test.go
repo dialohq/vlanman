@@ -101,7 +101,7 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					RemoteSubnet:    []string{"192.168.2.0/24"},
 					RemoteGatewayIP: "",
 					ExcludedNodes:   []string{},
-					Pools:           map[string][]string{},
+					Pools:           []vlanmanv1.VlanNetworkPool{},
 				},
 			},
 			expectedManager: ManagerSet{

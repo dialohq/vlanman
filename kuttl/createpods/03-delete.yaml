@@ -1,0 +1,16 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+delete:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      name: netwithpods1-pod-1
+      annotations:
+        vlanman.dialo.ai/network: netwithpods1
+        vlanman.dialo.ai/pool: primary
+    spec:
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: ubuntu
+          image: ubuntu:latest
+          command: ["sleep", "infinity"]

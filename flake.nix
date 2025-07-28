@@ -4,16 +4,13 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    nix2container.url = "github:nlewo/nix2container";
-    nix-filter.url = "github:numtide/nix-filter";
-    nixidy.url = "github:dialohq/nixidy/d010752e7f24ddaeedbdaf46aba127ca89d1483a";
+    nixidy.url = "github:arnarg/nixidy";
   };
 
   outputs = {
     nixpkgs,
     flake-utils,
-    nix-filter,
-    nix2container,
+    nixidy,
     ...
   }:
     flake-utils.lib.eachDefaultSystem (
@@ -22,43 +19,16 @@
           inherit system;
           config.allowUnfree = true;
         };
-        n2cPkgs = nix2container.packages.${system};
-        mkImg = n2cPkgs.nix2container.buildImage;
-      in rec {
-        packages = {
-          cad =
-            pkgs.runCommand "vlanman-as-dir" {}
-            "${packages.operatorImage.copyTo}/bin/copy-to dir:$out";
+      in {
+        nixidyEnvs = nixidy.lib.mkEnvs {
+          inherit pkgs;
+          envs = {
+            env.modules = [./k8s/env.nix];
+          };
+        };
 
-          operator = pkgs.buildGoModule {
-            pname = "vlanman-operator";
-            src = nix-filter {
-              root = ./.;
-              include = [
-                "api"
-                "internal"
-                "cmd"
-                "go.mod"
-                "go.sum"
-              ];
-            };
-            doCheck = false;
-            version = "0.0.1";
-            vendorHash = "sha256-lynECpqy6ptfeMEawSNVlrVcd521OSXUZutSTI7g5e4=";
-            env.CGO_ENABLED = 0;
-          };
-          operatorImage = mkImg {
-            name = "plan9better/vlanman-operator";
-            tag = "latest-dev";
-            copyToRoot =
-              pkgs.runCommand "operator-root" {
-                buildInputs = [packages.operator pkgs.uutils-coreutils-noprefix];
-              } ''
-                mkdir -p $out/bin
-                cp ${packages.operator}/bin/cmd $out/bin/manager
-                cp ${pkgs.uutils-coreutils-noprefix}/bin/* $out/bin/
-              '';
-          };
+        packages = {
+          nixidy = nixidy.packages.${system}.default;
         };
         devShells.default = pkgs.mkShell {
           packages = [

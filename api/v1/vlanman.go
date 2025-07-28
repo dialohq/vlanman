@@ -21,13 +21,19 @@ type VlanNetworkList struct {
 }
 
 type VlanNetworkSpec struct {
-	LocalGatewayIP  string              `json:"localGatewayIp"`
-	RemoteGatewayIP string              `json:"remoteGatewayIp"`
-	LocalSubnet     []string            `json:"localSubnet"`
-	RemoteSubnet    []string            `json:"remoteSubnet"`
-	VlanID          int                 `json:"vlanId"`
-	ExcludedNodes   []string            `json:"excludedNodes,omitempty"`
-	Pools           map[string][]string `json:"pools"`
+	LocalGatewayIP  string            `json:"localGatewayIp"`
+	RemoteGatewayIP string            `json:"remoteGatewayIp"`
+	LocalSubnet     []string          `json:"localSubnet"`
+	RemoteSubnet    []string          `json:"remoteSubnet"`
+	VlanID          int               `json:"vlanId"`
+	ExcludedNodes   []string          `json:"excludedNodes,omitempty"`
+	Pools           []VlanNetworkPool `json:"pools"`
+}
+
+type VlanNetworkPool struct {
+	Description string   `json:"description"`
+	Addresses   []string `json:"addresses"`
+	Name        string   `json:"name"`
 }
 
 type VlanNetworkStatus struct {
