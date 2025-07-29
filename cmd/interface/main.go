@@ -10,7 +10,7 @@ import (
 	ip "github.com/vishvananda/netlink"
 )
 
-func findDefaultInterface() (*ip.Link, error) {
+func findDefaultInterface() (ip.Link, error) {
 	_, dflt, err := net.ParseCIDR("0.0.0.0/0")
 	if err != nil {
 		return nil, fmt.Errorf("Error parsing CIDR: %s", err.Error())
@@ -29,7 +29,7 @@ func findDefaultInterface() (*ip.Link, error) {
 		}
 		for _, r := range routes {
 			if r.Dst.String() == dflt.String() {
-				return &l, nil
+				return l, nil
 			}
 		}
 	}
@@ -53,16 +53,30 @@ func main() {
 		log.Error("Couldn't parse PID to int", "PID", envPID, "error", err)
 		os.Exit(1)
 	}
+	var dflt ip.Link
 
-	dflt, err := findDefaultInterface()
-	if err != nil {
-		log.Error("Couldn't find default interface", "error", err)
-		os.Exit(1)
+	name := os.Getenv("INTERFACE")
+	if name == "" {
+		log.Info("Interface env var not set, finding by route")
+		dflt, err = findDefaultInterface()
+		if err != nil {
+			log.Error("Couldn't find default interface and env var is empty", "msg", err)
+			os.Exit(1)
+		}
+	} else {
+		log.Info("Interface env var set, finding by name")
+		dflt, err = ip.LinkByName(name)
+		if err != nil {
+			log.Error("Couldn't find interface from env var by name", "name", name, "msg", err)
+			os.Exit(1)
+		}
 	}
+	log.Info("Found interface", "name", dflt.Attrs().Name)
 
 	attrs := ip.NewLinkAttrs()
 	attrs.Name = "vlan" + envID
-	attrs.ParentIndex = (*dflt).Attrs().Index
+	log.Info("Setting parent index", "to", dflt.Attrs().Index, "from", dflt.Attrs().Name)
+	attrs.ParentIndex = dflt.Attrs().Index
 	vlan := ip.Vlan{
 		LinkAttrs: attrs,
 		VlanId:    int(ID),

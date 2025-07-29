@@ -11,12 +11,20 @@ import (
 )
 
 type InterfacePod struct {
-	ID   int
-	PID  int
-	Node string
+	ID            int
+	PID           int
+	Node          string
+	InterfaceName string
 }
 
-func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkName, pullPolicy string) batchv1.Job {
+func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkName, pullPolicy string, mappings []vlanmanv1.IPMapping) batchv1.Job {
+	intrface := ""
+	for _, m := range mappings {
+		if m.NodeName == p.Spec.NodeName {
+			intrface = m.Interface
+			break
+		}
+	}
 	var tgp int64 = 1
 	return batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -46,6 +54,10 @@ func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkNa
 								{
 									Name:  "ID",
 									Value: strconv.FormatInt(int64(id), 10),
+								},
+								{
+									Name:  "INTERFACE",
+									Value: intrface,
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{

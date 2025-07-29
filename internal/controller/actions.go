@@ -242,7 +242,7 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			}
 		}
 
-		job := interfaceFromDaemon(pod, PID.PID, int(a.Manager.VlanID), r.Env.TTL, r.Env.InterfacePodImage, a.Manager.OwnerNetworkName, r.Env.InterfacePodPullPolicy)
+		job := interfaceFromDaemon(pod, PID.PID, int(a.Manager.VlanID), r.Env.TTL, r.Env.InterfacePodImage, a.Manager.OwnerNetworkName, r.Env.InterfacePodPullPolicy, a.Manager.Mappings)
 		err = r.Client.Create(ctx, &job)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {

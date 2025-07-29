@@ -28,6 +28,12 @@ type VlanNetworkSpec struct {
 	VlanID          int               `json:"vlanId"`
 	ExcludedNodes   []string          `json:"excludedNodes,omitempty"`
 	Pools           []VlanNetworkPool `json:"pools"`
+	Mappings        []IPMapping       `json:"mappings"`
+}
+
+type IPMapping struct {
+	NodeName  string `json:"nodeName"`
+	Interface string `json:"interfaceName"`
 }
 
 type VlanNetworkPool struct {

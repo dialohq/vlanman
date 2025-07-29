@@ -20,6 +20,7 @@ type ManagerSet struct {
 	LocalRoutes      []string
 	RemoteRoutes     []string
 	ExcludedNodes    []string
+	Mappings         []vlanmanv1.IPMapping
 }
 
 func managerCmp(a, b ManagerSet) int {
@@ -241,5 +242,6 @@ func createDesiredManagerSet(network vlanmanv1.VlanNetwork) ManagerSet {
 		LocalRoutes:      network.Spec.LocalSubnet,
 		GatewaySubnet:    gwSnInt,
 		ExcludedNodes:    network.Spec.ExcludedNodes,
+		Mappings:         network.Spec.Mappings,
 	}
 }

@@ -21,6 +21,15 @@ spec:
             spec:
               type: object
               properties:
+                mappings:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      nodeName:
+                        type: string
+                      interfaceName:
+                        type: string
                 pools:
                   type: array
                   items:
@@ -56,6 +65,7 @@ spec:
                 - remoteSubnet
                 - localSubnet
                 - vlanId
+                - pools
             status:
               type: object
               properties:
