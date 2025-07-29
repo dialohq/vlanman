@@ -38,6 +38,7 @@
             pkgs.nilaway
             pkgs.golangci-lint
             pkgs.golangci-lint-langserver
+            pkgs.kubernetes-controller-tools
 
             # lsp
             pkgs.dockerfile-language-server-nodejs

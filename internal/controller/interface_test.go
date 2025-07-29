@@ -3,10 +3,10 @@ package controller
 import (
 	"testing"
 
+	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	// vlanmanv1 "dialo.ai/vlanman/api/v1"
 )
 
 func TestInterfaceFromDaemon(t *testing.T) {
@@ -63,7 +63,7 @@ func TestInterfaceFromDaemon(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			job := interfaceFromDaemon(tt.pod, tt.pid, tt.id, tt.ttl, tt.image, tt.networkName, tt.pullPolicy)
+			job := interfaceFromDaemon(tt.pod, tt.pid, tt.id, tt.ttl, tt.image, tt.networkName, tt.pullPolicy, []vlanmanv1.IPMapping{})
 
 			// Verify job metadata
 			assert.Equal(t, tt.expectedJob(), job.Name)

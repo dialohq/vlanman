@@ -324,7 +324,53 @@ func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPoli
 			Value: envs,
 		})
 	}
+
+	if len(network.Spec.ExcludedNodes) != 0 {
+		patches = append(patches, nodeAffinityPatch(pod, network.Spec.ExcludedNodes))
+	}
 	return patches
+}
+
+func nodeAffinityPatch(pod corev1.Pod, excludedNodes []string) jsonPatch {
+	// Build a complete affinity structure
+	affinity := pod.Spec.Affinity
+	var nodeSelectorTerms []any
+
+	// Reuse existing nodeSelectorTerms if present
+	if affinity != nil &&
+		affinity.NodeAffinity != nil &&
+		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		for _, term := range affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+			nodeSelectorTerms = append(nodeSelectorTerms, term)
+		}
+	}
+
+	// Append a new term
+	newTerm := map[string]any{
+		"matchExpressions": []map[string]any{
+			{
+				"key":      "kubernetes.io/hostname",
+				"operator": "NotIn",
+				"values":   excludedNodes,
+			},
+		},
+	}
+	nodeSelectorTerms = append(nodeSelectorTerms, newTerm)
+
+	// Construct the full affinity value
+	affinityValue := map[string]any{
+		"nodeAffinity": map[string]any{
+			"requiredDuringSchedulingIgnoredDuringExecution": map[string]any{
+				"nodeSelectorTerms": nodeSelectorTerms,
+			},
+		},
+	}
+
+	return jsonPatch{
+		Op:    "add",
+		Path:  "/spec/affinity",
+		Value: affinityValue,
+	}
 }
 
 func response(patch []jsonPatch, in *admissionv1.AdmissionReview) ([]byte, error) {
