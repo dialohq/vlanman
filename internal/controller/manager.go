@@ -120,23 +120,21 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 			},
 		},
 	}
-	terms := []corev1.NodeSelectorTerm{}
-	for _, node := range mgr.ExcludedNodes {
-		terms = append(terms, corev1.NodeSelectorTerm{
-			MatchExpressions: []corev1.NodeSelectorRequirement{
-				{
-					Key:      "kubernetes.io/hostname",
-					Operator: corev1.NodeSelectorOpNotIn,
-					Values:   []string{node},
-				},
-			},
-		})
-	}
-	if len(terms) != 0 {
+	if len(mgr.ExcludedNodes) != 0 {
 		spec.Spec.Template.Spec.Affinity = &corev1.Affinity{
 			NodeAffinity: &corev1.NodeAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					NodeSelectorTerms: terms,
+					NodeSelectorTerms: []corev1.NodeSelectorTerm{
+						{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "kubernetes.io/hostname",
+									Operator: corev1.NodeSelectorOpNotIn,
+									Values:   mgr.ExcludedNodes,
+								},
+							},
+						},
+					},
 				},
 			},
 		}
