@@ -19,7 +19,7 @@ type ManagerSet struct {
 	GatewaySubnet    int64
 	LocalRoutes      []string
 	RemoteRoutes     []string
-	ExcludedNodes    []string
+	ManagerAffinity  *corev1.Affinity
 	Mappings         []vlanmanv1.IPMapping
 }
 
@@ -120,24 +120,8 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 			},
 		},
 	}
-	if len(mgr.ExcludedNodes) != 0 {
-		spec.Spec.Template.Spec.Affinity = &corev1.Affinity{
-			NodeAffinity: &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					NodeSelectorTerms: []corev1.NodeSelectorTerm{
-						{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{
-									Key:      "kubernetes.io/hostname",
-									Operator: corev1.NodeSelectorOpNotIn,
-									Values:   mgr.ExcludedNodes,
-								},
-							},
-						},
-					},
-				},
-			},
-		}
+	if mgr.ManagerAffinity != nil {
+		spec.Spec.Template.Spec.Affinity = mgr.ManagerAffinity
 	}
 	return spec
 }
@@ -166,18 +150,19 @@ func serviceForManagerSet(d ManagerSet, namespace string) corev1.Service {
 }
 
 func managerFromSet(d appsv1.DaemonSet) ManagerSet {
-	excludedNodes := []string{}
-	if d.Spec.Template.Spec.Affinity != nil &&
-		d.Spec.Template.Spec.Affinity.NodeAffinity != nil &&
-		d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil &&
-		d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms != nil {
+	// excludedNodes := []string{}
+	// if d.Spec.Template.Spec.Affinity != nil &&
+	// 	d.Spec.Template.Spec.Affinity.NodeAffinity != nil &&
+	// 	d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil &&
+	// 	d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms != nil {
 
-		for _, t := range d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-			if len(t.MatchExpressions) != 0 {
-				excludedNodes = append(excludedNodes, t.MatchExpressions[0].Values...)
-			}
-		}
-	}
+	// 	for _, t := range d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+	// 		if len(t.MatchExpressions) != 0 {
+	// 			excludedNodes = append(excludedNodes, t.MatchExpressions[0].Values...)
+	// 		}
+	// 	}
+	// }
+	managerAffinity := d.Spec.Template.Spec.Affinity
 
 	envs := d.Spec.Template.Spec.Containers[0].Env
 	var vlanID int64 = -1
@@ -209,7 +194,7 @@ func managerFromSet(d appsv1.DaemonSet) ManagerSet {
 		RemoteRoutes:     remoteRoutes,
 		LocalRoutes:      localRoutes,
 		GatewaySubnet:    gatewaySubnet,
-		ExcludedNodes:    excludedNodes,
+		ManagerAffinity:  managerAffinity,
 	}
 }
 
@@ -239,7 +224,7 @@ func createDesiredManagerSet(network vlanmanv1.VlanNetwork) ManagerSet {
 		RemoteRoutes:     network.Spec.RemoteSubnet,
 		LocalRoutes:      network.Spec.LocalSubnet,
 		GatewaySubnet:    gwSnInt,
-		ExcludedNodes:    network.Spec.ExcludedNodes,
+		ManagerAffinity:  network.Spec.ManagerAffinity,
 		Mappings:         network.Spec.Mappings,
 	}
 }

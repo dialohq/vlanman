@@ -1,10 +1,14 @@
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:paths=vlannetworks,scope=Cluster,shortName=vlan
 type VlanNetwork struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -26,7 +30,7 @@ type VlanNetworkSpec struct {
 	LocalSubnet     []string          `json:"localSubnet"`
 	RemoteSubnet    []string          `json:"remoteSubnet"`
 	VlanID          int               `json:"vlanId"`
-	ExcludedNodes   []string          `json:"excludedNodes,omitempty"`
+	ManagerAffinity *corev1.Affinity  `json:"managerAffinity,omitempty"`
 	Pools           []VlanNetworkPool `json:"pools"`
 	Mappings        []IPMapping       `json:"mappings"`
 }

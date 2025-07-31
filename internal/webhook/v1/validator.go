@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 	"strings"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
@@ -24,19 +23,45 @@ type Validator struct {
 }
 
 func (v *Validator) validateMinimumNodes(net *vlanmanv1.VlanNetwork) error {
-	names := make([]string, len(v.Nodes))
-	for i, n := range v.Nodes {
-		names[i] = n.Name
-	}
-
-	for _, n := range net.Spec.ExcludedNodes {
-		names = slices.DeleteFunc(names, func(el string) bool {
-			return el == n
-		})
-	}
-
-	if len(names) == 0 {
+	if len(v.Nodes) == 0 {
 		return fmt.Errorf("There are no available nodes (make sure you don't exclude all nodes)")
+	}
+
+	// Check if ManagerAffinity would exclude all nodes
+	if net.Spec.ManagerAffinity != nil && 
+		net.Spec.ManagerAffinity.NodeAffinity != nil && 
+		net.Spec.ManagerAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+		
+		availableNodes := 0
+		for _, node := range v.Nodes {
+			nodeMatches := false
+			for _, term := range net.Spec.ManagerAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
+				for _, expr := range term.MatchExpressions {
+					if expr.Key == "kubernetes.io/hostname" && expr.Operator == corev1.NodeSelectorOpNotIn {
+						// Check if this node is in the excluded list
+						for _, excludedNode := range expr.Values {
+							if node.Name == excludedNode {
+								nodeMatches = true
+								break
+							}
+						}
+						if nodeMatches {
+							break
+						}
+					}
+				}
+				if nodeMatches {
+					break
+				}
+			}
+			if !nodeMatches {
+				availableNodes++
+			}
+		}
+		
+		if availableNodes == 0 {
+			return fmt.Errorf("There are no available nodes (make sure you don't exclude all nodes)")
+		}
 	}
 
 	return nil

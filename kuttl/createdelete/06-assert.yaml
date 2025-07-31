@@ -4,8 +4,15 @@ kind: VlanNetwork
 metadata:
   name: net3
 spec:
-  excludedNodes:
-    - k3s-1
+  managerAffinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: NotIn
+                values:
+                  - k3s-1
   localSubnet:
     - 192.168.30.0/24
   pools:
@@ -31,7 +38,15 @@ kind: VlanNetwork
 metadata:
   name: net4
 spec:
-  excludedNodes: ["k3s-2"]
+  managerAffinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: NotIn
+                values:
+                  - k3s-2
   vlanId: 400
   localSubnet:
     - 192.168.40.0/24

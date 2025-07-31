@@ -167,7 +167,7 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 				LocalGatewayIP: "192.168.1.1",
 				LocalSubnet:    []string{"192.168.1.0/24"},
 				RemoteSubnet:   []string{"192.168.2.0/24"},
-				ExcludedNodes:  []string{},
+				ManagerAffinity: nil,
 			},
 		}
 
@@ -217,7 +217,7 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 				LocalGatewayIP: "192.168.1.1",
 				LocalSubnet:    []string{"192.168.1.0/24"},
 				RemoteSubnet:   []string{"192.168.2.0/24"},
-				ExcludedNodes:  []string{},
+				ManagerAffinity: nil,
 			},
 		}
 
@@ -268,7 +268,23 @@ func TestValidatingWebhookHandler_ServeHTTP(t *testing.T) {
 				LocalGatewayIP: "192.168.1.1",
 				LocalSubnet:    []string{"192.168.1.0/24"},
 				RemoteSubnet:   []string{"192.168.2.0/24"},
-				ExcludedNodes:  []string{"node1", "node2"}, // Exclude all nodes
+				ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"node1", "node2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, // Exclude all nodes
 			},
 		}
 

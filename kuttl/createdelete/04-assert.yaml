@@ -3,7 +3,15 @@ kind: VlanNetwork
 metadata:
   name: net3
 spec:
-  excludedNodes: ["k3s-1"]
+  managerAffinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: NotIn
+                values:
+                  - k3s-1
   localSubnet:
     - "192.168.30.0/24"
   remoteSubnet:
@@ -89,6 +97,7 @@ spec:
             - name: PID
             - name: ID
               value: "300"
+            - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan

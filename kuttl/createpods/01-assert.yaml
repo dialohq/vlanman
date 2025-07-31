@@ -3,7 +3,6 @@ kind: VlanNetwork
 metadata:
   name: netwithpods1
 spec:
-  excludedNodes: []
   localSubnet: ["192.168.100.0/24"]
   remoteSubnet: ["192.168.200.0/24"]
   vlanId: 110
@@ -84,6 +83,7 @@ spec:
             - name: PID
             - name: ID
               value: "110"
+            - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan
@@ -120,6 +120,7 @@ spec:
             - name: PID
             - name: ID
               value: "110"
+            - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan

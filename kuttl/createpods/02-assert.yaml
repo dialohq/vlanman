@@ -41,7 +41,6 @@ kind: VlanNetwork
 metadata:
   name: netwithpods1
 spec:
-  excludedNodes: []
   localGatewayIp: "192.168.100.1"
   localSubnet:
     - "192.168.100.0/24"

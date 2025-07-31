@@ -3,7 +3,6 @@ kind: VlanNetwork
 metadata:
   name: neteditable2
 spec:
-  excludedNodes: []
   localGatewayIp: "192.168.100.2"
   localSubnet:
     - "192.168.30.0/24"
@@ -20,7 +19,6 @@ kind: VlanNetwork
 metadata:
   name: neteditable1
 spec:
-  excludedNodes: []
   localGatewayIp: "192.168.100.1"
   localSubnet:
     - "192.168.100.0/24"

@@ -64,7 +64,23 @@ func TestManagerFromDaemonSet(t *testing.T) {
 			expectedMgr: ManagerSet{
 				OwnerNetworkName: "net1",
 				VlanID:           100,
-				ExcludedNodes:    []string{"excluded-node"},
+				ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"excluded-node"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				GatewayIP:        "empty",
 				GatewaySubnet:    -1,
 				LocalRoutes:      []string{},
@@ -100,14 +116,14 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					LocalSubnet:     []string{"192.168.1.0/24"},
 					RemoteSubnet:    []string{"192.168.2.0/24"},
 					RemoteGatewayIP: "",
-					ExcludedNodes:   []string{},
+					ManagerAffinity: nil,
 					Pools:           []vlanmanv1.VlanNetworkPool{},
 				},
 			},
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "test-network",
 				VlanID:           100,
-				ExcludedNodes:    []string{},
+				ManagerAffinity:  nil,
 				LocalRoutes:      []string{"192.168.1.0/24"},
 				GatewayIP:        "192.168.1.1",
 				GatewaySubnet:    32,
@@ -126,13 +142,45 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					LocalGatewayIP: "10.0.0.1",
 					LocalSubnet:    []string{"10.0.0.0/16"},
 					RemoteSubnet:   []string{"10.1.0.0/16"},
-					ExcludedNodes:  []string{"node1", "node2"},
+					ManagerAffinity: &corev1.Affinity{
+						NodeAffinity: &corev1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+								NodeSelectorTerms: []corev1.NodeSelectorTerm{
+									{
+										MatchExpressions: []corev1.NodeSelectorRequirement{
+											{
+												Key:      "kubernetes.io/hostname",
+												Operator: corev1.NodeSelectorOpNotIn,
+												Values:   []string{"node1", "node2"},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "complex-network",
 				VlanID:           200,
-				ExcludedNodes:    []string{"node1", "node2"},
+				ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"node1", "node2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				GatewayIP:        "10.0.0.1",
 				GatewaySubnet:    32,
 				LocalRoutes:      []string{"10.0.0.0/16"},
@@ -152,7 +200,7 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "minimal-network",
 				VlanID:           42,
-				ExcludedNodes:    nil,
+				ManagerAffinity:  nil,
 				GatewaySubnet:    32,
 			},
 		},
@@ -167,13 +215,13 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					LocalGatewayIP: "172.16.0.1",
 					LocalSubnet:    []string{"172.16.0.0/12"},
 					RemoteSubnet:   []string{"172.17.0.0/12"},
-					ExcludedNodes:  []string{},
+					ManagerAffinity: nil,
 				},
 			},
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "zero-vlan-network",
 				VlanID:           0,
-				ExcludedNodes:    []string{},
+				ManagerAffinity:  nil,
 				GatewayIP:        "172.16.0.1",
 				GatewaySubnet:    32,
 				LocalRoutes:      []string{"172.16.0.0/12"},

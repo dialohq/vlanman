@@ -3,12 +3,11 @@ kind: VlanNetwork
 metadata:
   name: neteditable1
 spec:
-  excludedNodes: []
   localSubnet:
     - "192.168.100.0/24"
   pools:
     - name: primary
-      description: "Primary IP pool"  
+      description: "Primary IP pool"
       addresses:
         - "192.168.100.10"
   remoteSubnet:
@@ -84,6 +83,7 @@ spec:
             - name: PID
             - name: ID
               value: "120"
+            - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan
@@ -120,6 +120,7 @@ spec:
             - name: PID
             - name: ID
               value: "120"
+            - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:latest-dev
           imagePullPolicy: Always
           name: create-vlan

@@ -31,7 +31,7 @@ func TestValidator_validateMinimumNodes(t *testing.T) {
 			},
 			network: &vlanmanv1.VlanNetwork{
 				Spec: vlanmanv1.VlanNetworkSpec{
-					ExcludedNodes: []string{},
+					ManagerAffinity: nil,
 				},
 			},
 			expectedError: false,
@@ -45,7 +45,23 @@ func TestValidator_validateMinimumNodes(t *testing.T) {
 			},
 			network: &vlanmanv1.VlanNetwork{
 				Spec: vlanmanv1.VlanNetworkSpec{
-					ExcludedNodes: []string{"node1"},
+					ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"node1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				},
 			},
 			expectedError: false,
@@ -58,7 +74,23 @@ func TestValidator_validateMinimumNodes(t *testing.T) {
 			},
 			network: &vlanmanv1.VlanNetwork{
 				Spec: vlanmanv1.VlanNetworkSpec{
-					ExcludedNodes: []string{"node1", "node2"},
+					ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"node1", "node2"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				},
 			},
 			expectedError: true,
@@ -69,7 +101,7 @@ func TestValidator_validateMinimumNodes(t *testing.T) {
 			nodes: []corev1.Node{},
 			network: &vlanmanv1.VlanNetwork{
 				Spec: vlanmanv1.VlanNetworkSpec{
-					ExcludedNodes: []string{},
+					ManagerAffinity: nil,
 				},
 			},
 			expectedError: true,
@@ -83,7 +115,23 @@ func TestValidator_validateMinimumNodes(t *testing.T) {
 			},
 			network: &vlanmanv1.VlanNetwork{
 				Spec: vlanmanv1.VlanNetworkSpec{
-					ExcludedNodes: []string{"nonexistent-node"},
+					ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"nonexistent-node"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				},
 			},
 			expectedError: false,
@@ -264,7 +312,7 @@ func TestCreationValidator_Validate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new"},
 				Spec: vlanmanv1.VlanNetworkSpec{
 					VlanID:        200,
-					ExcludedNodes: []string{},
+					ManagerAffinity: nil,
 				},
 			},
 			expectedError: false,
@@ -279,7 +327,23 @@ func TestCreationValidator_Validate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new"},
 				Spec: vlanmanv1.VlanNetworkSpec{
 					VlanID:        200,
-					ExcludedNodes: []string{"node1"},
+					ManagerAffinity: &corev1.Affinity{
+					NodeAffinity: &corev1.NodeAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							NodeSelectorTerms: []corev1.NodeSelectorTerm{
+								{
+									MatchExpressions: []corev1.NodeSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: corev1.NodeSelectorOpNotIn,
+											Values:   []string{"node1"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
 				},
 			},
 			expectedError: true,
@@ -300,7 +364,7 @@ func TestCreationValidator_Validate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "new"},
 				Spec: vlanmanv1.VlanNetworkSpec{
 					VlanID:        100, // Duplicate
-					ExcludedNodes: []string{},
+					ManagerAffinity: nil,
 				},
 			},
 			expectedError: true,

@@ -93,7 +93,6 @@ func (wh *ValidatingWebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 	action := getAction(in.Request)
-
 	allow := false
 	var message error = nil
 	switch action.(type) {

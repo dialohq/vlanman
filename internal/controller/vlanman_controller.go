@@ -130,15 +130,8 @@ func (r *VlanmanReconciler) diffManagers(desired, current ManagerSet) []Action {
 	if !eq {
 		return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
 	}
-	if len(desired.ExcludedNodes) != len(current.ExcludedNodes) {
+	if !reflect.DeepEqual(current.ManagerAffinity, desired.ManagerAffinity) {
 		return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
-	}
-	slices.Sort(desired.ExcludedNodes)
-	slices.Sort(current.ExcludedNodes)
-	for idx, n := range desired.ExcludedNodes {
-		if n != current.ExcludedNodes[idx] {
-			return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
-		}
 	}
 	return []Action{}
 }
@@ -401,6 +394,17 @@ func (r *VlanmanReconciler) ensurePodMonitor(ctx context.Context) error {
 
 var done bool = false
 
+// +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;update;create;watch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;update;create;watch;delete
+// +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=watch;list
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;update;create;list;watch
+// +kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=create;delete;list;get;watch;update
+// +kubebuilder:rbac:groups=vlanman.dialo.ai,resources=vlannetworks,verbs=create;delete;list;get;watch;update
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=podmonitors,verbs=create;delete;list;get;watch;update
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;list;get;watch;update
+// +kubebuilder:rbac:groups="",resources=services,verbs=create;delete;list;get;watch;update
+// +kubebuilder:rbac:groups=vlanman.dialo.ai,resources=vlannetworks/status,verbs=get;update;create;patch
 func (r *VlanmanReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 	log.Info("Starting reconciler")

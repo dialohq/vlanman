@@ -14,4 +14,3 @@ spec:
       addresses:
         - "192.168.30.10"
   localGatewayIp: "192.168.100.2"
-  excludedNodes: []

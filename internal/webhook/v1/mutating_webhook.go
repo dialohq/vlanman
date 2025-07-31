@@ -325,46 +325,52 @@ func preparePatch(pod corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPoli
 		})
 	}
 
-	if len(network.Spec.ExcludedNodes) != 0 {
-		patches = append(patches, nodeAffinityPatch(pod, network.Spec.ExcludedNodes))
+	if network.Spec.ManagerAffinity != nil {
+		patches = append(patches, affinityPatch(pod, *network.Spec.ManagerAffinity))
 	}
 	return patches
 }
 
-func nodeAffinityPatch(pod corev1.Pod, excludedNodes []string) jsonPatch {
-	// Build a complete affinity structure
-	affinity := pod.Spec.Affinity
-	var nodeSelectorTerms []any
-
-	// Reuse existing nodeSelectorTerms if present
-	if affinity != nil &&
-		affinity.NodeAffinity != nil &&
-		affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		for _, term := range affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-			nodeSelectorTerms = append(nodeSelectorTerms, term)
-		}
+func mergeAffinity(base, override *corev1.Affinity) *corev1.Affinity {
+	if base == nil {
+		return override
+	}
+	if override == nil {
+		return base
 	}
 
-	// Append a new term
-	newTerm := map[string]any{
-		"matchExpressions": []map[string]any{
-			{
-				"key":      "kubernetes.io/hostname",
-				"operator": "NotIn",
-				"values":   excludedNodes,
-			},
-		},
-	}
-	nodeSelectorTerms = append(nodeSelectorTerms, newTerm)
+	merged := &corev1.Affinity{}
 
-	// Construct the full affinity value
-	affinityValue := map[string]any{
-		"nodeAffinity": map[string]any{
-			"requiredDuringSchedulingIgnoredDuringExecution": map[string]any{
-				"nodeSelectorTerms": nodeSelectorTerms,
-			},
-		},
+	if base.NodeAffinity == nil {
+		merged.NodeAffinity = override.NodeAffinity
+	} else if override.NodeAffinity == nil {
+		merged.NodeAffinity = base.NodeAffinity
+	} else {
+		merged.NodeAffinity = override.NodeAffinity
 	}
+
+	if base.PodAffinity == nil {
+		merged.PodAffinity = override.PodAffinity
+	} else if override.PodAffinity == nil {
+		merged.PodAffinity = base.PodAffinity
+	} else {
+		merged.PodAffinity = override.PodAffinity
+	}
+
+	if base.PodAntiAffinity == nil {
+		merged.PodAntiAffinity = override.PodAntiAffinity
+	} else if override.PodAntiAffinity == nil {
+		merged.PodAntiAffinity = base.PodAntiAffinity
+	} else {
+		merged.PodAntiAffinity = override.PodAntiAffinity
+	}
+
+	return merged
+}
+
+func affinityPatch(pod corev1.Pod, managerAffinity corev1.Affinity) jsonPatch {
+	podAffinity := pod.Spec.Affinity
+	affinityValue := mergeAffinity(podAffinity, &managerAffinity)
 
 	return jsonPatch{
 		Op:    "add",

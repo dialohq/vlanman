@@ -6,7 +6,15 @@ delete:
     metadata:
       name: net3
     spec:
-      excludedNodes: ["k3s-1"]
+      managerAffinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - k3s-1
       gatewayIp: "192.168.100.3"
       localSubnet: "192.168.30.0/24"
       remoteSubnet: "192.168.40.0/24"
@@ -16,7 +24,15 @@ delete:
     metadata:
       name: net4
     spec:
-      excludedNodes: ["k3s-2"]
+      managerAffinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: NotIn
+                    values:
+                      - k3s-2
       gatewayIp: "192.168.100.4"
       localSubnet: "192.168.40.0/24"
       remoteSubnet: "192.168.50.0/24"

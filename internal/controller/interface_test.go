@@ -94,12 +94,15 @@ func TestInterfaceFromDaemon(t *testing.T) {
 			expectedEnvVars := []corev1.EnvVar{
 				{Name: "PID", Value: "12345"},
 				{Name: "ID", Value: "100"},
+				{Name: "INTERFACE", Value: ""},
 			}
 			if tt.pid == 67890 {
 				expectedEnvVars = []corev1.EnvVar{
 					{Name: "PID", Value: "67890"},
 					{Name: "ID", Value: "200"},
+					{Name: "INTERFACE", Value: ""},
 				}
+
 			}
 			assert.Equal(t, expectedEnvVars, container.Env)
 
