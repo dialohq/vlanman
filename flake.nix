@@ -157,7 +157,7 @@
           };
         };
 
-        version = "dev";
+        version = "0.1.4";
         packages = {
           inherit generate manifests;
           chart = chart version;
