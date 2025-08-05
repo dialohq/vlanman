@@ -1,25 +1,28 @@
 package main
 
 import (
-	"log"
-	"net/http"
 	"os"
 	"strconv"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"dialo.ai/vlanman/internal/controller"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+
+	_ "net/http/pprof"
+
+	corewhv1 "dialo.ai/vlanman/internal/webhook/corev1"
 	vlanmanwhv1 "dialo.ai/vlanman/internal/webhook/v1"
 	promv1 "github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "net/http/pprof"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	// +kubebuilder:scaffold:imports
 )
 
 var (
@@ -31,13 +34,21 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(vlanmanv1.AddToScheme(scheme))
 	utilruntime.Must(promv1.AddToScheme(scheme))
+	// +kubebuilder:scaffold:scheme
 }
 
 func main() {
 	logf.SetLogger(zap.New(zap.UseDevMode(true)))
 
+	logger.Info("New webhook")
+	whServer := webhook.NewServer(webhook.Options{
+		Port:    vlanmanv1.WebhookServerPort,
+		CertDir: vlanmanv1.WebhookServerCertDir,
+	})
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), manager.Options{
-		Scheme: scheme,
+		Scheme:        scheme,
+		WebhookServer: whServer,
 	})
 	if err != nil || mgr == nil {
 		logger.Error(err, "Creating manager failed")
@@ -94,33 +105,30 @@ func main() {
 		logger.Error(err, "Creating controller failed")
 		os.Exit(1)
 	}
+	// if err = mgr.Add(whServer); err != nil {
+	// 	logger.Error(err, "Error registering wh server with the manager")
+	// 	os.Exit(1)
+	// }
 
-	logger.Info("New webhook")
-	whServer := webhook.NewServer(webhook.Options{
-		Port:    vlanmanv1.WebhookServerPort,
-		CertDir: vlanmanv1.WebhookServerCertDir,
-	})
-
-	if err = mgr.Add(whServer); err != nil {
-		logger.Error(err, "Error registering wh server with the manager")
+	if err = vlanmanwhv1.SetupVlanmanWebhookWithManager(mgr, e); err != nil {
+		logger.Error(err, "unable to create webhook", "webhook", "vlanman")
+		os.Exit(1)
+	}
+	if err = corewhv1.SetupVlanmanWebhookWithManager(mgr, e); err != nil {
+		logger.Error(err, "unable to create webhook", "webhook", "corev1")
 		os.Exit(1)
 	}
 
-	mwh := vlanmanwhv1.MutatingWebhookHandler{
-		Client: mgr.GetClient(),
-		Config: *mgr.GetConfig(),
-		Env:    e,
+	// +kubebuilder:scaffold:builder
+
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		logger.Error(err, "unable to set up health check")
+		os.Exit(1)
 	}
-	vwh := vlanmanwhv1.ValidatingWebhookHandler{
-		Client: mgr.GetClient(),
-		Config: *mgr.GetConfig(),
-		Env:    e,
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+		logger.Error(err, "unable to set up ready check")
+		os.Exit(1)
 	}
-	whServer.Register("/mutating", &mwh)
-	whServer.Register("/validating", &vwh)
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
 
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		logger.Error(err, "problem running manager")

@@ -63,7 +63,7 @@ spec:
               value: 192.168.40.0/24
             - name: LOCAL_ROUTES
               value: 192.168.30.0/24
-          image: 192.168.10.201:5000/vlan-manager:latest-dev
+          image: 192.168.10.201:5000/vlan-manager:dev
           name: vlan-manager
           securityContext:
             capabilities:
@@ -98,7 +98,7 @@ spec:
             - name: ID
               value: "300"
             - name: INTERFACE
-          image: 192.168.10.201:5000/vlan-interface:latest-dev
+          image: 192.168.10.201:5000/vlan-interface:dev
           imagePullPolicy: Always
           name: create-vlan
           securityContext:

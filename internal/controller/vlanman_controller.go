@@ -405,6 +405,7 @@ var done bool = false
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;list;get;watch;update
 // +kubebuilder:rbac:groups="",resources=services,verbs=create;delete;list;get;watch;update
 // +kubebuilder:rbac:groups=vlanman.dialo.ai,resources=vlannetworks/status,verbs=get;update;create;patch
+
 func (r *VlanmanReconciler) Reconcile(ctx context.Context, req reconcile.Request) (reconcile.Result, error) {
 	log := log.FromContext(ctx)
 	log.Info("Starting reconciler")

@@ -1,6 +1,6 @@
 // +kubebuilder:object:generate=true
-// +groupName=vlanman.dialo.ai
-package v1
+// +groupName=""
+package corev1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	GroupVersion = schema.GroupVersion{Group: "vlanman.dialo.ai", Version: "v1"}
+	GroupVersion = schema.GroupVersion{Group: "core", Version: "v1"}
 
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 

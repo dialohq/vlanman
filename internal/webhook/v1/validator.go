@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -28,10 +27,10 @@ func (v *Validator) validateMinimumNodes(net *vlanmanv1.VlanNetwork) error {
 	}
 
 	// Check if ManagerAffinity would exclude all nodes
-	if net.Spec.ManagerAffinity != nil && 
-		net.Spec.ManagerAffinity.NodeAffinity != nil && 
+	if net.Spec.ManagerAffinity != nil &&
+		net.Spec.ManagerAffinity.NodeAffinity != nil &&
 		net.Spec.ManagerAffinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
-		
+
 		availableNodes := 0
 		for _, node := range v.Nodes {
 			nodeMatches := false
@@ -58,7 +57,7 @@ func (v *Validator) validateMinimumNodes(net *vlanmanv1.VlanNetwork) error {
 				availableNodes++
 			}
 		}
-		
+
 		if availableNodes == 0 {
 			return fmt.Errorf("There are no available nodes (make sure you don't exclude all nodes)")
 		}
@@ -85,7 +84,7 @@ type CreationValidator struct {
 	NewNetwork *vlanmanv1.VlanNetwork
 }
 
-func NewCreationValidator(k8s client.Client, ctx context.Context, obj []byte) (*CreationValidator, error) {
+func NewCreationValidator(k8s client.Client, ctx context.Context, network *vlanmanv1.VlanNetwork) (*CreationValidator, error) {
 	allPods := &corev1.PodList{}
 	err := k8s.List(ctx, allPods)
 	if err != nil {
@@ -101,10 +100,6 @@ func NewCreationValidator(k8s client.Client, ctx context.Context, obj []byte) (*
 	if err != nil {
 		return nil, fmt.Errorf("Error listing VlanNetworks: %w", err)
 	}
-	newVlanNetwork := &vlanmanv1.VlanNetwork{}
-	if err = json.Unmarshal(obj, newVlanNetwork); err != nil {
-		return nil, fmt.Errorf("Couldn't unmarshal vlan network for creation: %w", err)
-	}
 	validator := &Validator{
 		Nodes:    allNodes.Items,
 		Pods:     allPods.Items,
@@ -112,7 +107,7 @@ func NewCreationValidator(k8s client.Client, ctx context.Context, obj []byte) (*
 	}
 	return &CreationValidator{
 		Validator:  validator,
-		NewNetwork: newVlanNetwork,
+		NewNetwork: network,
 	}, nil
 }
 
@@ -130,7 +125,7 @@ type UpdateValidator struct {
 	NewNetwork *vlanmanv1.VlanNetwork
 }
 
-func NewUpdateValidator(k8s client.Client, ctx context.Context, newObj, oldObj []byte) (*UpdateValidator, error) {
+func NewUpdateValidator(k8s client.Client, ctx context.Context, newNetwork, oldNetwork *vlanmanv1.VlanNetwork) (*UpdateValidator, error) {
 	allPods := &corev1.PodList{}
 	err := k8s.List(ctx, allPods)
 	if err != nil {
@@ -146,14 +141,6 @@ func NewUpdateValidator(k8s client.Client, ctx context.Context, newObj, oldObj [
 	if err != nil {
 		return nil, fmt.Errorf("Error listing VlanNetworks: %w", err)
 	}
-	newVlanNetwork := &vlanmanv1.VlanNetwork{}
-	if err = json.Unmarshal(newObj, newVlanNetwork); err != nil {
-		return nil, fmt.Errorf("Couldn't unmarshal vlan network for Update: %w", err)
-	}
-	oldVlanNetwork := &vlanmanv1.VlanNetwork{}
-	if err = json.Unmarshal(oldObj, oldVlanNetwork); err != nil {
-		return nil, fmt.Errorf("Couldn't unmarshal vlan network for update: %w", err)
-	}
 
 	validator := &Validator{
 		Nodes:    allNodes.Items,
@@ -162,8 +149,8 @@ func NewUpdateValidator(k8s client.Client, ctx context.Context, newObj, oldObj [
 	}
 	return &UpdateValidator{
 		Validator:  validator,
-		NewNetwork: newVlanNetwork,
-		OldNetwork: oldVlanNetwork,
+		NewNetwork: newNetwork,
+		OldNetwork: oldNetwork,
 	}, nil
 }
 
@@ -187,13 +174,9 @@ type DeletionValidator struct {
 	DeletedNetwork *vlanmanv1.VlanNetwork
 }
 
-func NewDeletionValidator(k8s client.Client, ctx context.Context, obj []byte) (*DeletionValidator, error) {
-	toDeleteVlanNetwork := &vlanmanv1.VlanNetwork{}
-	if err := json.Unmarshal(obj, toDeleteVlanNetwork); err != nil {
-		return nil, fmt.Errorf("Couldn't unmarshal vlan network for deletion: %w", err)
-	}
+func NewDeletionValidator(k8s client.Client, ctx context.Context, network *vlanmanv1.VlanNetwork) (*DeletionValidator, error) {
 	relevantPods := &corev1.PodList{}
-	req, err := labels.NewRequirement(vlanmanv1.WorkerPodLabelKey, "==", []string{toDeleteVlanNetwork.Name})
+	req, err := labels.NewRequirement(vlanmanv1.WorkerPodLabelKey, "==", []string{network.Name})
 	if err != nil || req == nil {
 		return nil, &errs.InternalError{Context: "Couldn't create a label requirement to list pods in  NewDeletionValidator"}
 	}
@@ -208,7 +191,7 @@ func NewDeletionValidator(k8s client.Client, ctx context.Context, obj []byte) (*
 	}
 	return &DeletionValidator{
 		Validator:      validator,
-		DeletedNetwork: toDeleteVlanNetwork,
+		DeletedNetwork: network,
 	}, nil
 }
 
@@ -216,10 +199,11 @@ var ErrNetInUse error = errors.New("Network is still used by pods")
 
 type NetInUseError struct {
 	Pods []string
+	Name string
 }
 
 func (e *NetInUseError) Error() string {
-	return fmt.Sprintf("Network is still used by %d pods: %s", len(e.Pods), strings.Join(e.Pods, ", "))
+	return fmt.Sprintf("Network %s is still used by %d pods: %s", e.Name, len(e.Pods), strings.Join(e.Pods, ", "))
 }
 
 func (e *NetInUseError) Unwrap() error {
@@ -238,7 +222,7 @@ func (cv *DeletionValidator) validateNotInUse() error {
 		}
 	}
 	if len(names) != 0 {
-		return &NetInUseError{Pods: names}
+		return &NetInUseError{Pods: names, Name: cv.DeletedNetwork.Name}
 	}
 	return nil
 }

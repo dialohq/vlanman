@@ -3,5 +3,6 @@ kind: TestSuite
 timeout: 60
 skipDelete: false
 startKind: false
+parallel: 1
 testDirs:
   - ./kuttl

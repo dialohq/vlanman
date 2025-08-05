@@ -18,17 +18,17 @@ publish:
 	docker push $(DOCKERHUB_USER)/vlan-interface:$(VERSION) 
 
 test:
-	docker build -t $(LOCAL_REGISTRY)/vlanman:latest-dev --platform linux/amd64 --file ./operator.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlanman:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlanman:dev --platform linux/amd64 --file ./operator.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(LOCAL_REGISTRY)/vlanman:dev 
 
-	docker build -t $(LOCAL_REGISTRY)/vlan-manager:latest-dev --platform linux/amd64 --file ./manager.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlan-manager:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlan-manager:dev --platform linux/amd64 --file ./manager.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(LOCAL_REGISTRY)/vlan-manager:dev 
 
-	docker build -t $(LOCAL_REGISTRY)/vlan-worker:latest-dev --platform linux/amd64 --file ./worker.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlan-worker:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlan-worker:dev --platform linux/amd64 --file ./worker.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(LOCAL_REGISTRY)/vlan-worker:dev 
 
-	docker build -t $(LOCAL_REGISTRY)/vlan-interface:latest-dev --platform linux/amd64 --file ./interface.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlan-interface:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlan-interface:dev --platform linux/amd64 --file ./interface.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(LOCAL_REGISTRY)/vlan-interface:dev 
 
 test-local:
 	docker build -t $(LOCAL_REGISTRY)/vlanman:$(VERSION) --platform linux/arm64 --file ./operator.Dockerfile --build-arg PLATFORM=arm64 .
@@ -45,20 +45,20 @@ test-local:
 
 
 vlanman:
-	docker build -t $(LOCAL_REGISTRY)/vlanman:latest-dev --platform linux/arm64 --file ./operator.Dockerfile .
-	docker push $(LOCAL_REGISTRY)/vlanman:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlanman:dev --platform linux/arm64 --file ./operator.Dockerfile .
+	docker push $(LOCAL_REGISTRY)/vlanman:dev 
 
 manager:
-	docker build -t $(LOCAL_REGISTRY)/vlan-manager:latest-dev --platform linux/arm64 --file ./manager.Dockerfile .
-	docker push $(LOCAL_REGISTRY)/vlan-manager:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlan-manager:dev --platform linux/arm64 --file ./manager.Dockerfile .
+	docker push $(LOCAL_REGISTRY)/vlan-manager:dev 
 
 interface:
-	docker build -t $(LOCAL_REGISTRY)/vlan-interface:latest-dev --platform linux/arm64 --file ./interface.Dockerfile .
-	docker push $(LOCAL_REGISTRY)/vlan-interface:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlan-interface:dev --platform linux/arm64 --file ./interface.Dockerfile .
+	docker push $(LOCAL_REGISTRY)/vlan-interface:dev 
 
 worker:
-	docker build -t $(LOCAL_REGISTRY)/vlan-worker:latest-dev --platform linux/arm64 --file ./worker.Dockerfile .
-	docker push $(LOCAL_REGISTRY)/vlan-worker:latest-dev 
+	docker build -t $(LOCAL_REGISTRY)/vlan-worker:dev --platform linux/arm64 --file ./worker.Dockerfile .
+	docker push $(LOCAL_REGISTRY)/vlan-worker:dev 
 
 all: vlanman manager interface worker
 
