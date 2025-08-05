@@ -157,7 +157,6 @@
           };
         };
 
-        version = "dev";
         packages = {
           inherit generate manifests;
           chart = chart version;
@@ -203,6 +202,7 @@
             EDITOR = "hx";
           };
         };
+        version = "dev";
       }
     );
 }

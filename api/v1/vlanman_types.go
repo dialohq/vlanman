@@ -26,21 +26,15 @@ type VlanNetworkList struct {
 	Items           []VlanNetwork `json:"items"`
 }
 
+type Gateway struct {
+	// +kubebuilder:validation:Pattern=`^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\/(3[0-2]|2[0-9]|1[0-9]|[0-9]))?$`
+	Address string  `json:"address"`
+	Routes  []Route `json:"routes"`
+}
+
 type VlanNetworkSpec struct {
-	// LocalGatewayIP specifies the IP address of the local gateway for the VLAN network
-	// +kubebuilder:validation:Pattern=`^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`
 	// +optional
-	LocalGatewayIP string `json:"localGatewayIp"`
-	// RemoteGatewayIP specifies the IP address of the remote gateway for the VLAN network
-	// +kubebuilder:validation:Pattern=`^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$`
-	// +optional
-	RemoteGatewayIP string `json:"remoteGatewayIp"`
-	// LocalSubnet defines the list of local subnet CIDR blocks
-	// +kubebuilder:validation:MinItems=1
-	LocalSubnet []string `json:"localSubnet"`
-	// RemoteSubnet defines the list of remote subnet CIDR blocks
-	// +kubebuilder:validation:MinItems=1
-	RemoteSubnet []string `json:"remoteSubnet"`
+	Gateways []Gateway `json:"gateways"`
 	// VlanID specifies the VLAN identifier (1-4094)
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Maximum=4094
@@ -65,9 +59,23 @@ type IPMapping struct {
 	Interface string `json:"interfaceName"`
 }
 
+type Route struct {
+	// Destination specifies the target subnet for the route, in CIDR format. For example: "10.0.0.0/24", you can omit the subnet mask, in that case '/32' will be chosen. 10.0.0.0 -> 10.0.0.0/32
+	// +kubebuilder:validation:Pattern=`^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\/(3[0-2]|2[0-9]|1[0-9]|[0-9]))?$`
+	Destination string `json:"dest"`
+	// Via specifies the next-hop IP address for the route. If omitted, the route is assumed to be directly connected.
+	// +optional
+	Via *string `json:"via"`
+	// Source determines how the source IP is selected for this route. Allowed values: "self": use an IP assigned from the current VLAN pool, "none": no source IP (use default behavior)
+	// +kubebuilder:validation:Enum=self;none
+	Source string `json:"src"`
+}
+
 type VlanNetworkPool struct {
 	// Description provides a human-readable description of the IP pool
-	Description string `json:"description"`
+	// +optional
+	Description string  `json:"description"`
+	Routes      []Route `json:"routes"`
 	// Addresses contains the list of IP addresses or CIDR blocks in this pool
 	// +kubebuilder:validation:MinItems=1
 	Addresses []string `json:"addresses"`
