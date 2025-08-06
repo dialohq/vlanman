@@ -4,3 +4,5 @@ kubeconfig
 .direnv
 .helix
 *.nu
+vendor
+*.zsh
