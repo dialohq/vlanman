@@ -134,6 +134,7 @@
 
               export VERSION=${version}
               perl -pi -e 's|(image:\s*")[^/]+/([^:"]+):[^"]+|\1$ENV{REGISTRY}/\2:$ENV{VERSION}|' final/values.yaml
+              perl -pi -e 's/pullPolicy:\s*Always/pullPolicy: IfNotPresent/g' final/values.yaml
 
               # version
               yq '.version="${
@@ -203,7 +204,7 @@
             EDITOR = "hx";
           };
         };
-        version = "dev";
+        version = "0.1.5";
       }
     );
 }

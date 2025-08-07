@@ -28,13 +28,13 @@ controller:
   affinity: {}
 manager:
   image: "192.168.10.201:5000/vlan-manager:latest-dev"
-  pullPolicy: "Always"
+  pullPolicy: Always
 worker:
   image: "192.168.10.201:5000/vlan-worker:latest-dev"
-  pullPolicy: "Always"
+  pullPolicy: Always
 interface:
   image: "192.168.10.201:5000/vlan-interface:latest-dev"
-  pullPolicy: "Always"
+  pullPolicy: Always
   jobTTLSeconds: 300 # negative values mean never
 # Webhook configuration
 webhook:

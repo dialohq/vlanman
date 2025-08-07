@@ -14,7 +14,28 @@ entries:
           - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
       apiVersion: v2
       appVersion: 1.16.0
-      created: "2025-08-05T17:58:28.448279+02:00"
+      created: "2025-08-07T15:56:41.935689+02:00"
+      description: VLAN network manager
+      digest: 34a50a6a95d7c171f597cff2afb786b8149ecb11b05d199f1c93034dcd7309cf
+      name: vlanman
+      type: application
+      urls:
+        - https://github.com/dialohq/vlanman/releases/download/v0.1.5/vlanman-0.1.5.tgz
+      version: 0.1.5
+    - annotations:
+        artifacthub.io/category: networking
+        artifacthub.io/crds: |
+          - kind: VlanNetwork
+            version: v1
+            name: vlannetwork
+            description: Defines the VLAN connection
+        artifacthub.io/license: MIT
+        artifacthub.io/recommendations: |
+          - https://artifacthub.io/packages/helm/cert-manager/cert-manager
+          - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
+      apiVersion: v2
+      appVersion: 1.16.0
+      created: "2025-08-07T15:56:41.933775+02:00"
       description: VLAN network manager
       digest: 7555c142d6f65eb7a52d0135685b6bbe32407f0e69c6e113b580a467eb259a30
       name: vlanman
@@ -35,7 +56,7 @@ entries:
           - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
       apiVersion: v2
       appVersion: 1.16.0
-      created: "2025-08-05T17:58:28.44618+02:00"
+      created: "2025-08-07T15:56:41.931348+02:00"
       description: VLAN network manager
       digest: 8e2efb5c505d6b963b74e704eaf96ee4cabae4a6fe2317d4dd8c494fa6013b8e
       name: vlanman
@@ -56,7 +77,7 @@ entries:
           - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
       apiVersion: v2
       appVersion: 1.16.0
-      created: "2025-08-05T17:58:28.444225+02:00"
+      created: "2025-08-07T15:56:41.929552+02:00"
       description: VLAN network manager
       digest: 4a4c3b41a49039bb06b13221dc5a42973813e546a51a362cdf6f693c07fb90b4
       name: vlanman
@@ -77,7 +98,7 @@ entries:
           - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
       apiVersion: v2
       appVersion: 1.16.0
-      created: "2025-08-05T17:58:28.44292+02:00"
+      created: "2025-08-07T15:56:41.928333+02:00"
       description: VLAN network manager
       digest: ab1060ee1c74386328a1913148b305e245a4dcbeea28cc8fb1cf4945f00c330d
       name: vlanman
@@ -98,7 +119,7 @@ entries:
           - https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
       apiVersion: v2
       appVersion: 1.16.0
-      created: "2025-08-05T17:58:28.442305+02:00"
+      created: "2025-08-07T15:56:41.927378+02:00"
       description: VLAN network manager
       digest: 0bf004ba2202856151915191f652966b1850352072d0af9a83fddf53e96aaa57
       name: vlanman
@@ -106,4 +127,4 @@ entries:
       urls:
         - https://github.com/dialohq/vlanman/releases/download/v0.1.0/vlanman-0.1.0.tgz
       version: 0.1.0
-generated: "2025-08-05T17:58:28.441328+02:00"
+generated: "2025-08-07T15:56:41.92634+02:00"
