@@ -3,25 +3,30 @@ kind: VlanNetwork
 metadata:
   name: net2
 spec:
-  vlanId: 200
-  localSubnet:
-    - "192.168.200.0/24"
-  remoteSubnet:
-    - "192.168.30.0/24"
+  vlanId: 130
+  gateways:
+    - address: "10.0.1.1/24"
+      routes:
+        - dest: "10.10.10.10/24"
+          src: "none"
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.200.10"
-        - "192.168.200.11"
-        - "192.168.200.12"
-  localGatewayIp: "192.168.100.2"
+        - "10.0.0.1/24"
+      routes:
+        - dest: "10.0.1.1/32"
+          src: "self"
+          scopeLink: true
+        - dest: "10.10.10.10"
+          via: "10.0.1.1"
+          src: none
 status:
   freeIPs:
     primary:
-      - "192.168.200.10"
-      - "192.168.200.11"
-      - "192.168.200.12"
+      - "10.0.0.1/24"
+  pendingIPs:
+    primary: {}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -36,21 +41,15 @@ spec:
       containers:
         - env:
             - name: VLAN_ID
-              value: "200"
+              value: "130"
             - name: NAMESPACE
               value: vlanman-system
             - name: LOCK_NAME
               value: vlanman-leader-election-net2
             - name: OWNER_NETWORK
               value: net2
-            - name: LOCAL_GATEWAY_IP
-              value: 192.168.100.2
-            - name: LOCAL_GATEWAY_SUBNET
-              value: "32"
-            - name: REMOTE_ROUTES
-              value: 192.168.30.0/24
-            - name: LOCAL_ROUTES
-              value: 192.168.200.0/24
+            - name: POOLS
+            - name: GATEWAYS
           image: 192.168.10.201:5000/vlan-manager:dev
           name: vlan-manager
           securityContext:
@@ -84,7 +83,7 @@ spec:
         - env:
             - name: PID
             - name: ID
-              value: "200"
+              value: "130"
             - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:dev
           imagePullPolicy: Always
@@ -121,149 +120,7 @@ spec:
         - env:
             - name: PID
             - name: ID
-              value: "200"
-            - name: INTERFACE
-          image: 192.168.10.201:5000/vlan-interface:dev
-          imagePullPolicy: Always
-          name: create-vlan
-          securityContext:
-            capabilities:
-              add:
-                - NET_ADMIN
-                - NET_RAW
-      hostNetwork: true
-      hostPID: true
-      nodeSelector:
-        kubernetes.io/hostname: k3s-2
-status:
-  ready: 0
-  succeeded: 1
-  terminating: 0
----
-apiVersion: vlanman.dialo.ai/v1
-kind: VlanNetwork
-metadata:
-  name: net1
-spec:
-  localSubnet:
-    - "192.168.100.0/24"
-  pools:
-    - name: primary
-      description: "Primary IP pool"
-      addresses:
-        - "192.168.100.10"
-        - "192.168.100.11"
-        - "192.168.100.12"
-  remoteSubnet:
-    - "192.168.200.0/24"
-  vlanId: 100
-  localGatewayIp: "192.168.100.1"
-status:
-  freeIPs:
-    primary:
-      - 192.168.100.10
-      - 192.168.100.11
-      - 192.168.100.12
----
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: vlan-manager-net1
-  namespace: vlanman-system
-  labels:
-    vlanman.dialo.ai/manager: net1
-spec:
-  template:
-    spec:
-      containers:
-        - env:
-            - name: VLAN_ID
-              value: "100"
-            - name: NAMESPACE
-              value: "vlanman-system"
-            - name: LOCK_NAME
-              value: vlanman-leader-election-net1
-            - name: OWNER_NETWORK
-              value: net1
-            - name: LOCAL_GATEWAY_IP
-              value: 192.168.100.1
-            - name: LOCAL_GATEWAY_SUBNET
-              value: "32"
-            - name: REMOTE_ROUTES
-              value: 192.168.200.0/24
-            - name: LOCAL_ROUTES
-              value: 192.168.100.0/24
-          image: 192.168.10.201:5000/vlan-manager:dev
-          name: vlan-manager
-          securityContext:
-            capabilities:
-              add:
-                - NET_ADMIN
-                - NET_RAW
-      hostPID: true
-status:
-  currentNumberScheduled: 2
-  desiredNumberScheduled: 2
-  numberAvailable: 2
-  numberMisscheduled: 0
-  numberReady: 2
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  labels:
-    job-name: create-vlan-job-net1-k3s-1
-  name: create-vlan-job-net1-k3s-1
-  namespace: vlanman-system
-spec:
-  template:
-    metadata:
-      labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net1-k3s-1
-        job-name: create-vlan-job-net1-k3s-1
-    spec:
-      containers:
-        - env:
-            - name: PID
-            - name: ID
-              value: "100"
-            - name: INTERFACE
-          image: 192.168.10.201:5000/vlan-interface:dev
-          imagePullPolicy: Always
-          name: create-vlan
-          securityContext:
-            capabilities:
-              add:
-                - NET_ADMIN
-                - NET_RAW
-      hostNetwork: true
-      hostPID: true
-      nodeSelector:
-        kubernetes.io/hostname: k3s-1
-status:
-  ready: 0
-  succeeded: 1
-  terminating: 0
----
-apiVersion: batch/v1
-kind: Job
-metadata:
-  labels:
-    job-name: create-vlan-job-net1-k3s-2
-  name: create-vlan-job-net1-k3s-2
-  namespace: vlanman-system
-spec:
-  template:
-    metadata:
-      labels:
-        batch.kubernetes.io/job-name: create-vlan-job-net1-k3s-2
-        job-name: create-vlan-job-net1-k3s-2
-    spec:
-      containers:
-        - env:
-            - name: PID
-            - name: ID
-              value: "100"
+              value: "130"
             - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:dev
           imagePullPolicy: Always

@@ -4,13 +4,12 @@ metadata:
   name: netwithpods1
 spec:
   vlanId: 110
-  localSubnet: ["192.168.100.0/24"]
-  remoteSubnet: ["192.168.200.0/24"]
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.100.10"
-        - "192.168.100.11"
-        - "192.168.100.12"
-  localGatewayIp: "192.168.100.1"
+        - "10.0.0.1/32"
+      routes:
+        - dest: "10.10.10.10/32"
+          src: "self"
+          scopeLink: true

@@ -3,16 +3,21 @@ kind: VlanNetwork
 metadata:
   name: net2
 spec:
-  vlanId: 200
-  localSubnet:
-    - "192.168.200.0/24"
-  remoteSubnet:
-    - "192.168.30.0/24"
+  vlanId: 130
+  gateways:
+    - address: "10.0.1.1/24"
+      routes:
+        - dest: "10.10.10.10/24"
+          src: "none"
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.200.10"
-        - "192.168.200.11"
-        - "192.168.200.12"
-  localGatewayIp: "192.168.100.2"
+        - "10.0.0.1/24"
+      routes:
+        - dest: "10.0.1.1/32"
+          src: "self"
+          scopeLink: true
+        - dest: "10.10.10.10"
+          via: "10.0.1.1"
+          src: none

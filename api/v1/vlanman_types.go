@@ -69,6 +69,9 @@ type Route struct {
 	// Source determines how the source IP is selected for this route. Allowed values: "self": use an IP assigned from the current VLAN pool, "none": no source IP (use default behavior)
 	// +kubebuilder:validation:Enum=self;none
 	Source string `json:"src"`
+	// ScopeLink determines whether the scope of the route will be set to 'LINK', for routes to the gateway it is required.
+	// +optional
+	ScopeLink bool `json:"scopeLink"`
 }
 
 type VlanNetworkPool struct {

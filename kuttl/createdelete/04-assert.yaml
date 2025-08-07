@@ -3,28 +3,30 @@ kind: VlanNetwork
 metadata:
   name: net3
 spec:
-  managerAffinity:
-    nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-        nodeSelectorTerms:
-          - matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: NotIn
-                values:
-                  - k3s-1
-  localSubnet:
-    - "192.168.30.0/24"
-  remoteSubnet:
-    - "192.168.40.0/24"
+  vlanId: 110
+  gateways:
+    - address: "10.0.1.1/24"
+      routes:
+        - dest: "10.10.10.10/24"
+          src: "none"
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.30.10"
-        - "192.168.30.11"
-        - "192.168.30.12"
-  vlanId: 300
-  localGatewayIp: "192.168.100.3"
+        - "10.0.0.1/24"
+      routes:
+        - dest: "10.0.1.1/32"
+          src: "self"
+          scopeLink: true
+        - dest: "10.10.10.10"
+          via: "10.0.1.1"
+          src: none
+status:
+  freeIPs:
+    primary:
+      - "10.0.0.1/24"
+  pendingIPs:
+    primary: {}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -48,21 +50,15 @@ spec:
       containers:
         - env:
             - name: VLAN_ID
-              value: "300"
+              value: "110"
             - name: NAMESPACE
               value: vlanman-system
             - name: LOCK_NAME
               value: vlanman-leader-election-net3
             - name: OWNER_NETWORK
               value: net3
-            - name: LOCAL_GATEWAY_IP
-              value: 192.168.100.3
-            - name: LOCAL_GATEWAY_SUBNET
-              value: "32"
-            - name: REMOTE_ROUTES
-              value: 192.168.40.0/24
-            - name: LOCAL_ROUTES
-              value: 192.168.30.0/24
+            - name: POOLS
+            - name: GATEWAYS
           image: 192.168.10.201:5000/vlan-manager:dev
           name: vlan-manager
           securityContext:
@@ -96,7 +92,7 @@ spec:
         - env:
             - name: PID
             - name: ID
-              value: "300"
+              value: "110"
             - name: INTERFACE
           image: 192.168.10.201:5000/vlan-interface:dev
           imagePullPolicy: Always

@@ -1,0 +1,70 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/kyverno/chainsaw/main/.schemas/json/test-chainsaw-v1alpha1.json
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  creationTimestamp: null
+  name: createdelete
+spec:
+  steps:
+    - name: step-01
+      try:
+        - apply:
+            file: 01-valid-network.yaml
+        - assert:
+            file: 01-assert.yaml
+    - name: step-02
+      try:
+        - apply:
+            file: 02-add-another-network.yaml
+        - assert:
+            file: 02-assert.yaml
+    - name: step-03
+      try:
+        - delete:
+            ref:
+              apiVersion: vlanman.dialo.ai/v1
+              kind: VlanNetwork
+              name: net1
+        - assert:
+            file: 03-assert.yaml
+        - error:
+            file: 03-errors.yaml
+    - name: step-04
+      try:
+        - apply:
+            file: 04-excluded-nixos.yaml
+        - assert:
+            file: 04-assert.yaml
+    - name: step-05
+      try:
+        - apply:
+            file: 05-excluded-nixos2.yaml
+        - assert:
+            file: 05-assert.yaml
+    - name: step-06
+      try:
+        - delete:
+            ref:
+              apiVersion: vlanman.dialo.ai/v1
+              kind: VlanNetwork
+              name: net2
+        - error:
+            file: 06-errors.yaml
+    - name: step-07
+      try:
+        - delete:
+            file: 07-delete.yaml
+        - error:
+            file: 07-errors.yaml
+    - name: step-08
+      try:
+        - apply:
+            file: 08-add-final.yaml
+        - assert:
+            file: 08-assert.yaml
+    - name: step-09
+      try:
+        - delete:
+            file: 09-delete.yaml
+        - error:
+            file: 09-errors.yaml

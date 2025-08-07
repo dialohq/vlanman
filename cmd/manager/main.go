@@ -20,6 +20,7 @@ import (
 	"syscall"
 	"time"
 
+	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"dialo.ai/vlanman/pkg/comms"
 	errs "dialo.ai/vlanman/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -174,15 +175,17 @@ func addIPAddress(ctx context.Context) {
 		})
 		os.Exit(1)
 	}
-	err = ip.AddrAdd(link, &ip.Addr{IPNet: &gatewayIPNet})
-	if err != nil && !isFileExistsErr(err) {
-		logger.Error("Failed to add IP address to VLAN when becoming leader", "msg", &errs.UnrecoverableError{
-			Context: "Error adding ip address to vlan on becoming leader in callback",
-			Err:     err,
-		})
-		os.Exit(1)
+	for _, ipnet := range gatewayIPNets {
+		err = ip.AddrAdd(link, &ip.Addr{IPNet: &ipnet})
+		if err != nil && !isFileExistsErr(err) {
+			logger.Error("Failed to add IP address to VLAN when becoming leader", "msg", &errs.UnrecoverableError{
+				Context: "Error adding ip address to vlan on becoming leader in callback",
+				Err:     err,
+			})
+			os.Exit(1)
+		}
 	}
-	setupRoutes(os.Getenv("REMOTE_ROUTES"), os.Getenv("LOCAL_ROUTES"))
+	setupRoutes()
 }
 func removeIPAddress() {
 	link, err := ip.LinkByName("macvlangw" + strconv.FormatInt(int64(envs.vlanID), 10))
@@ -193,13 +196,15 @@ func removeIPAddress() {
 		})
 		os.Exit(1)
 	}
-	err = ip.AddrDel(link, &ip.Addr{IPNet: &gatewayIPNet})
-	if err != nil {
-		logger.Error("msg", "Failed to delete IP address from VLAN when stopped leading", &errs.UnrecoverableError{
-			Context: "Error deleting ip address from vlan on stopped leading in callback",
-			Err:     err,
-		})
-		os.Exit(1)
+	for _, ipnet := range gatewayIPNets {
+		err = ip.AddrAdd(link, &ip.Addr{IPNet: &ipnet})
+		if err != nil && !isFileExistsErr(err) {
+			logger.Error("Failed to delete IP address to VLAN when stopped leading", "msg", &errs.UnrecoverableError{
+				Context: "Error deleting ip address from vlan on stopped leading in callback",
+				Err:     err,
+			})
+			os.Exit(1)
+		}
 	}
 }
 
@@ -212,51 +217,53 @@ var (
 	vlanWatcher      *VlanWatcher = nil
 	gatewayLink      *ip.Macvlan
 	vlanID           int
-	gatewayIPNet     net.IPNet
+	gatewayIPNets    []net.IPNet
 	remoteRoutes     string
 	leaderChanges    atomic.Int64
 	lastLeaderChange atomic.Value
 	localRoutes      string
 )
 
-func setupRoutes(rem, loc string) error {
+func setupRoutes() error {
 	var link ip.Link
 	if gatewayLink != nil {
 		link = gatewayLink
 	} else {
 		link = vlanWatcher.Link
 	}
-	remote := strings.SplitSeq(rem, ",")
-	for r := range remote {
-		_, ipnet, err := net.ParseCIDR(r)
-		if err != nil {
-			return err
-		}
-		route := ip.Route{
-			LinkIndex: link.Attrs().Index,
-			Dst:       ipnet,
-		}
-		err = ip.RouteAdd(&route)
-		if err != nil {
-			return err
-		}
-	}
-	if gatewayLink == nil {
-		return nil
-	}
 
-	for r := range strings.SplitSeq(loc, ",") {
-		_, ipnet, err := net.ParseCIDR(r)
-		if err != nil {
-			return err
-		}
-		route := ip.Route{
-			LinkIndex: (*gatewayLink).Attrs().Index,
-			Dst:       ipnet,
-		}
-		err = ip.RouteAdd(&route)
-		if err != nil {
-			return err
+	for _, gw := range envs.Gateways {
+		for _, r := range gw.Routes {
+			_, ipnet, err := net.ParseCIDR(r.Destination)
+			if err != nil {
+				return err
+			}
+
+			route := ip.Route{}
+			if r.Via != nil {
+				_, gwIpnet, err := net.ParseCIDR(*r.Via)
+				if err != nil {
+					return err
+				}
+
+				route = ip.Route{
+					LinkIndex: link.Attrs().Index,
+					Dst:       ipnet,
+					Gw:        gwIpnet.IP,
+				}
+			} else {
+				route = ip.Route{
+					LinkIndex: link.Attrs().Index,
+					Dst:       ipnet,
+				}
+			}
+			if r.Source == "self" {
+				route.Src = net.ParseIP(gw.Address)
+			}
+			err = ip.RouteAdd(&route)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -278,12 +285,11 @@ func begin() context.Context {
 }
 
 type Envs struct {
-	ownerNetName     string
-	namespace        string
-	vlanID           int
-	lockName         string
-	localGatewayIP   string
-	isLocalGatewayOn bool
+	ownerNetName string
+	namespace    string
+	vlanID       int
+	lockName     string
+	Gateways     []vlanmanv1.Gateway
 }
 
 func getEnvs() Envs {
@@ -316,16 +322,24 @@ func getEnvs() Envs {
 
 	namespace := os.Getenv("NAMESPACE")
 	lockName := os.Getenv("LOCK_NAME")
-	localGatewayIP := os.Getenv("LOCAL_GATEWAY_IP")
-	isLocalGatewayOn := localGatewayIP != ""
+	gatewaysJSON := os.Getenv("GATEWAYS")
+
+	gateways := []vlanmanv1.Gateway{}
+
+	if gatewaysJSON != "" {
+		err = json.Unmarshal([]byte(gatewaysJSON), &gateways)
+		if err != nil {
+			logger.Error("Couldn't unmarshal GATEWAYS env var", "err", err)
+			os.Exit(1)
+		}
+	}
 
 	return Envs{
-		ownerNetName:     ownerNetName,
-		namespace:        namespace,
-		lockName:         lockName,
-		localGatewayIP:   localGatewayIP,
-		isLocalGatewayOn: isLocalGatewayOn,
-		vlanID:           vlanID,
+		ownerNetName: ownerNetName,
+		namespace:    namespace,
+		lockName:     lockName,
+		Gateways:     gateways,
+		vlanID:       vlanID,
 	}
 }
 
@@ -348,21 +362,25 @@ func interfaceSetup(ctx context.Context, e Envs) {
 		os.Exit(1)
 	}
 
-	if !e.isLocalGatewayOn {
+	if len(e.Gateways) == 0 {
 		logger.Info("Skipping leader election, gateway is off")
-		setupRoutes(os.Getenv("REMOTE_ROUTES"), os.Getenv("LOCAL_ROUTES"))
+		setupRoutes()
 		return
 	}
 
-	gatewaySubnet := os.Getenv("LOCAL_GATEWAY_SUBNET")
-	gwInt, err := strconv.ParseInt(gatewaySubnet, 10, 64)
-	if err != nil {
-		gwInt = 32
+	gatewayIPNets = []net.IPNet{}
+	for _, gw := range e.Gateways {
+		gwAddr, gwSubnetStr, found := strings.Cut(gw.Address, "/")
+		if !found {
+			gwSubnetStr = "32"
+		}
+		gwSubnet, _ := strconv.ParseInt(gwSubnetStr, 10, 64)
+		gatewayIPNets = append(gatewayIPNets, net.IPNet{
+			IP:   net.ParseIP(gwAddr),
+			Mask: net.CIDRMask(int(gwSubnet), 32),
+		})
 	}
-	gatewayIPNet = net.IPNet{
-		IP:   net.ParseIP(e.localGatewayIP),
-		Mask: net.CIDRMask(int(gwInt), 32),
-	}
+
 	attrs := ip.NewLinkAttrs()
 	attrs.Name = "macvlangw" + strconv.FormatInt(int64(e.vlanID), 10)
 	attrs.ParentIndex = vlanWatcher.Link.Attrs().Index

@@ -3,25 +3,30 @@ kind: VlanNetwork
 metadata:
   name: net5
 spec:
-  localSubnet:
-    - "192.168.50.0/24"
-  remoteSubnet:
-    - "192.168.60.0/24"
   vlanId: 500
+  gateways:
+    - address: "10.0.1.1/24"
+      routes:
+        - dest: "10.10.10.10/24"
+          src: "none"
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.50.10"
-        - "192.168.50.11"
-        - "192.168.50.12"
-  localGatewayIp: "192.168.100.5"
+        - "10.0.0.1/24"
+      routes:
+        - dest: "10.0.1.1/32"
+          src: "self"
+          scopeLink: true
+        - dest: "10.10.10.10"
+          via: "10.0.1.1"
+          src: none
 status:
   freeIPs:
     primary:
-      - "192.168.50.10"
-      - "192.168.50.11"
-      - "192.168.50.12"
+      - 10.0.0.1/24
+  pendingIPs:
+    primary: {}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -43,14 +48,8 @@ spec:
               value: vlanman-leader-election-net5
             - name: OWNER_NETWORK
               value: net5
-            - name: LOCAL_GATEWAY_IP
-              value: 192.168.100.5
-            - name: LOCAL_GATEWAY_SUBNET
-              value: "32"
-            - name: REMOTE_ROUTES
-              value: 192.168.60.0/24
-            - name: LOCAL_ROUTES
-              value: 192.168.50.0/24
+            - name: POOLS
+            - name: GATEWAYS
           image: 192.168.10.201:5000/vlan-manager:dev
           name: vlan-manager
           securityContext:

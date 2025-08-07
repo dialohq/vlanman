@@ -90,8 +90,14 @@ type CreateManagerAction struct {
 
 func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) error {
 	log := log.FromContext(ctx)
-	daemonSet := daemonSetFromManager(a.Manager, r.Env)
-	err := r.Client.Create(ctx, &daemonSet)
+	daemonSet, err := daemonSetFromManager(a.Manager, r.Env)
+	if err != nil {
+		return &errs.UnrecoverableError{
+			Context: "Error creating a daemonset from manager specification",
+			Err:     err,
+		}
+	}
+	err = r.Client.Create(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
 			Action: "Create daemonset",
@@ -347,8 +353,15 @@ type DeleteManagerAction struct {
 }
 
 func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) error {
-	daemonSet := daemonSetFromManager(a.Manager, r.Env)
-	err := r.Client.Delete(ctx, &daemonSet)
+	daemonSet, err := daemonSetFromManager(a.Manager, r.Env)
+	if err != nil {
+		return &errs.UnrecoverableError{
+			Context: "Error creating a daemonset from manager specification",
+			Err:     err,
+		}
+	}
+
+	err = r.Client.Delete(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
 			Action: "Delete daemonset",

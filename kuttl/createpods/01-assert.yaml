@@ -3,23 +3,22 @@ kind: VlanNetwork
 metadata:
   name: netwithpods1
 spec:
-  localSubnet: ["192.168.100.0/24"]
-  remoteSubnet: ["192.168.200.0/24"]
   vlanId: 110
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.100.10"
-        - "192.168.100.11"
-        - "192.168.100.12"
-  localGatewayIp: "192.168.100.1"
+        - "10.0.0.1/32"
+      routes:
+        - dest: "10.10.10.10/32"
+          src: "self"
+          scopeLink: true
 status:
   freeIPs:
     primary:
-      - "192.168.100.10"
-      - "192.168.100.11"
-      - "192.168.100.12"
+      - "10.0.0.1/32"
+  pendingIPs:
+    primary: {}
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -41,14 +40,9 @@ spec:
               value: vlanman-leader-election-netwithpods1
             - name: OWNER_NETWORK
               value: netwithpods1
-            - name: LOCAL_GATEWAY_IP
-              value: "192.168.100.1"
-            - name: LOCAL_GATEWAY_SUBNET
-              value: "32"
-            - name: REMOTE_ROUTES
-              value: 192.168.200.0/24
-            - name: LOCAL_ROUTES
-              value: 192.168.100.0/24
+            # no need to check the exact values since there is a readyness probe now
+            - name: POOLS
+            - name: GATEWAYS
           image: 192.168.10.201:5000/vlan-manager:dev
           name: vlan-manager
           securityContext:

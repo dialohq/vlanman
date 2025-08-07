@@ -110,7 +110,11 @@ func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, 
 	// TODO: check if interfaces are created
 	mgrs := []ManagerSet{}
 	for _, m := range managers.Items {
-		mgrs = append(mgrs, managerFromSet(m))
+		newMgr, err := managerFromSet(m)
+		if err != nil {
+			return nil, err
+		}
+		mgrs = append(mgrs, newMgr)
 	}
 	return mgrs, nil
 }

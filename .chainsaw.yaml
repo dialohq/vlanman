@@ -1,0 +1,10 @@
+apiVersion: chainsaw.kyverno.io/v1alpha2
+kind: Configuration
+metadata:
+  name: example
+spec:
+  cleanup:
+    skipDelete: false
+  execution:
+    failFast: true
+    parallel: 1

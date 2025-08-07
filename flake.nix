@@ -193,6 +193,7 @@
             pkgs.glow
             pkgs.mods
             pkgs.graphviz
+            pkgs.kyverno-chainsaw
           ];
           shellHook = ''
             go mod tidy

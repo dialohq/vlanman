@@ -18,17 +18,17 @@ publish:
 	docker push $(DOCKERHUB_USER)/vlan-interface:$(VERSION) 
 
 test:
-	docker build -t $(LOCAL_REGISTRY)/vlanman:dev --platform linux/amd64 --file ./operator.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlanman:dev 
+	docker build -t $(DOCKERHUB_USER)/vlanman:dev --platform linux/amd64 --file ./operator.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(DOCKERHUB_USER)/vlanman:dev 
 
-	docker build -t $(LOCAL_REGISTRY)/vlan-manager:dev --platform linux/amd64 --file ./manager.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlan-manager:dev 
+	docker build -t $(DOCKERHUB_USER)/vlan-manager:dev --platform linux/amd64 --file ./manager.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(DOCKERHUB_USER)/vlan-manager:dev 
 
-	docker build -t $(LOCAL_REGISTRY)/vlan-worker:dev --platform linux/amd64 --file ./worker.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlan-worker:dev 
+	docker build -t $(DOCKERHUB_USER)/vlan-worker:dev --platform linux/amd64 --file ./worker.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(DOCKERHUB_USER)/vlan-worker:dev 
 
-	docker build -t $(LOCAL_REGISTRY)/vlan-interface:dev --platform linux/amd64 --file ./interface.Dockerfile --build-arg PLATFORM=amd64 .
-	docker push $(LOCAL_REGISTRY)/vlan-interface:dev 
+	docker build -t $(DOCKERHUB_USER)/vlan-interface:dev --platform linux/amd64 --file ./interface.Dockerfile --build-arg PLATFORM=amd64 .
+	docker push $(DOCKERHUB_USER)/vlan-interface:dev 
 
 test-local:
 	docker build -t $(LOCAL_REGISTRY)/vlanman:$(VERSION) --platform linux/arm64 --file ./operator.Dockerfile --build-arg PLATFORM=arm64 .

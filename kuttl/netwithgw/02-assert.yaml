@@ -1,21 +1,21 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: netwithpods1-pod-1
+  name: netwithgw1-pod-1
   annotations:
-    vlanman.dialo.ai/network: netwithpods1
+    vlanman.dialo.ai/network: netwithgw1
     vlanman.dialo.ai/pool: primary
   labels:
-    vlanman.dialo.ai/worker: netwithpods1
+    vlanman.dialo.ai/worker: netwithgw1
 spec:
   initContainers:
     - env:
         - name: VLAN_NETWORK
-          value: netwithpods1
+          value: netwithgw1
         - name: MACVLAN_IP
           value: "10.0.0.1"
         - name: MACVLAN_SUBNET
-          value: "32"
+          value: "24"
         - name: ROUTES
         - name: MANAGERS
       name: init-vlan
@@ -30,7 +30,7 @@ spec:
         - name: VLAN_IP
           value: "10.0.0.1"
         - name: VLAN_SUBNET
-          value: "32"
+          value: "24"
 status:
   containerStatuses:
     - name: ubuntu
@@ -41,18 +41,26 @@ status:
 apiVersion: vlanman.dialo.ai/v1
 kind: VlanNetwork
 metadata:
-  name: netwithpods1
+  name: netwithgw1
 spec:
+  vlanId: 110
+  gateways:
+    - address: "10.0.1.1/24"
+      routes:
+        - dest: 10.10.10.10/24
+          src: none
   pools:
     - name: primary
-      description: "Primary IP pool"
+      description: primary pool
       addresses:
-        - 10.0.0.1/32
+        - "10.0.0.1/24"
       routes:
-        - dest: "10.10.10.10/32"
-          src: "self"
+        - dest: "10.0.1.1/32"
+          src: self
           scopeLink: true
-  vlanId: 110
+        - dest: "10.10.10.10"
+          via: "10.0.1.1"
+          src: none
 status:
   freeIPs:
     primary: []

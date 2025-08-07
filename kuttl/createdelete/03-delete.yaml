@@ -1,6 +1,0 @@
-apiVersion: kuttl.dev/v1beta1
-kind: TestStep
-delete:
-  - apiVersion: vlanman.dialo.ai/v1
-    kind: VlanNetwork
-    name: net1

@@ -2,12 +2,14 @@ package corev1
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"dialo.ai/vlanman/internal/controller"
 	errs "dialo.ai/vlanman/pkg/errors"
 	"dialo.ai/vlanman/pkg/locker"
 	u "dialo.ai/vlanman/pkg/utils"
-	"fmt"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,13 +17,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"k8s.io/client-go/rest"
 	"maps"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"slices"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
 func SetupVlanmanWebhookWithManager(mgr ctrl.Manager, e controller.Envs) error {
@@ -151,19 +154,31 @@ func (v *VlanmanPodCustomDefaulter) Default(ctx context.Context, obj runtime.Obj
 		endpoints[man.Spec.NodeName] = man.Status.PodIP
 	}
 
-	applyPatch(pod, *network, v.Env.WorkerInitImage, v.Env.WorkerInitPullPolicy, *assignedIP, endpoints)
+	routes := []vlanmanv1.Route{} // network.Spec.Pools
+	for _, pool := range network.Spec.Pools {
+		if pool.Name != poolName {
+			continue
+		}
+		routes = pool.Routes
+		break
+	}
+
+	routesJSON, err := json.Marshal(routes)
+	if err != nil {
+		return &errs.ParsingError{
+			Source: "Marshaling routes",
+			Err:    err,
+		}
+	}
+
+	applyPatch(pod, *network, v.Env.WorkerInitImage, v.Env.WorkerInitPullPolicy, *assignedIP, endpoints, string(routesJSON))
 	return nil
 }
 
-func applyPatch(pod *corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPolicy, IP string, endpoints map[string]string) {
+func applyPatch(pod *corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPolicy, IP string, endpoints map[string]string, routes string) {
 	address, subnet, found := strings.Cut(IP, "/")
 	if !found {
 		subnet = "32"
-	}
-
-	gwAddr, gwSubnet, found := strings.Cut(network.Spec.RemoteGatewayIP, "/")
-	if !found {
-		gwSubnet = "32"
 	}
 
 	if len(pod.Labels) != 0 {
@@ -202,16 +217,8 @@ func applyPatch(pod *corev1.Pod, network vlanmanv1.VlanNetwork, image, pullPolic
 				Value: subnet,
 			},
 			{
-				Name:  "REMOTE_ROUTES",
-				Value: strings.Join(network.Spec.RemoteSubnet, ","),
-			},
-			{
-				Name:  "GATEWAY_IP",
-				Value: gwAddr,
-			},
-			{
-				Name:  "GATEWAY_SUBNET",
-				Value: gwSubnet,
+				Name:  "ROUTES",
+				Value: routes,
 			},
 			{
 				Name:  "MANAGERS",

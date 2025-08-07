@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: netwithpods1-pod-1
+  name: netwithgw1-pod-1
   annotations:
-    vlanman.dialo.ai/network: netwithpods1
+    vlanman.dialo.ai/network: netwithgw1
     vlanman.dialo.ai/pool: primary
 spec:
   terminationGracePeriodSeconds: 1
@@ -23,7 +23,7 @@ spec:
             - -c
             - "1"
             - "10.10.10.10"
-        initialDelaySeconds: 5
+        initialDelaySeconds: 3
         periodSeconds: 1
         timeoutSeconds: 2
         failureThreshold: 1

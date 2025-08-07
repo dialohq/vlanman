@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	vlanmanv1 "dialo.ai/vlanman/api/v1"
 	"dialo.ai/vlanman/pkg/comms"
 	errs "dialo.ai/vlanman/pkg/errors"
 	"github.com/go-logr/logr"
@@ -134,61 +135,52 @@ func main() {
 			Err:     err,
 		})
 	}
-	gwIP := os.Getenv("GATEWAY_IP")
-	gwSN := os.Getenv("GATEWAY_SUBNET")
-	isRemoteGW := false
-	var gwIPNet *net.IPNet
-	if gwIP != "" {
-		isRemoteGW = true
-		if gwSN == "" {
-			gwSN = "32"
+	routesJSON := os.Getenv("ROUTES")
+
+	routes := []vlanmanv1.Route{}
+	err = json.Unmarshal([]byte(routesJSON), &routes)
+	if err != nil {
+		fatal(&errs.ParsingError{
+			Source: "Couldn't unmarshal ROUTES env var",
+			Err:    err,
+		})
+	}
+
+	for _, r := range routes {
+		addr, maskStr, found := strings.Cut(r.Destination, "/")
+		if !found {
+			maskStr = "32"
 		}
-		_, gwIPNet, err = net.ParseCIDR(gwIP + "/" + gwSN)
+		mask, _ := strconv.ParseInt(maskStr, 10, 64)
+
 		if err != nil {
 			fatal(&errs.ParsingError{
-				Source: "Parsing CIRD of remote gateway",
+				Source: "CIDR of route",
 				Err:    err,
 			})
 		}
-		gwRoute := ip.Route{
+
+		route := ip.Route{
 			LinkIndex: link.Attrs().Index,
-			Scope:     ip.SCOPE_LINK,
-			Dst:       gwIPNet,
+			Dst: &net.IPNet{
+				IP:   net.ParseIP(addr),
+				Mask: net.CIDRMask(int(mask), 32),
+			},
 		}
-		err = ip.RouteAdd(&gwRoute)
-		if err != nil && !isAlreadyExists(err) {
-			fatal(&errs.UnrecoverableError{
-				Context: "Failed to add route to remote gateway",
-				Err:     err,
-			})
+		if r.Via != nil {
+			route.Gw = net.ParseIP(*r.Via)
 		}
-	}
-	routes := strings.SplitSeq(os.Getenv("REMOTE_ROUTES"), ",")
-	for r := range routes {
-		_, ipnet, err := net.ParseCIDR(r)
+		if r.ScopeLink {
+			route.Scope = ip.SCOPE_LINK
+		}
+		if r.Source == "self" {
+			route.Src = ipnet.IP
+		}
+
+		err = ip.RouteAdd(&route)
 		if err != nil {
 			fatal(&errs.UnrecoverableError{
-				Context: fmt.Sprintf("Failed to parse route to remote '%s'", r),
-				Err:     err,
-			})
-		}
-		route := ip.Route{}
-		if isRemoteGW {
-			route = ip.Route{
-				LinkIndex: link.Attrs().Index,
-				Gw:        gwIPNet.IP,
-				Dst:       ipnet,
-			}
-		} else {
-			route = ip.Route{
-				LinkIndex: link.Attrs().Index,
-				Dst:       ipnet,
-			}
-		}
-		err = ip.RouteAdd(&route)
-		if err != nil && !strings.Contains(strings.ToLower(err.Error()), "file exists") {
-			fatal(&errs.UnrecoverableError{
-				Context: fmt.Sprintf("Failed to add route to remote '%s'", r),
+				Context: fmt.Sprintf("Error adding route %+v", route),
 				Err:     err,
 			})
 		}

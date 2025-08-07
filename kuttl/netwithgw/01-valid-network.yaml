@@ -1,22 +1,22 @@
 apiVersion: vlanman.dialo.ai/v1
 kind: VlanNetwork
 metadata:
-  name: neteditable2
+  name: netwithgw1
 spec:
-  vlanId: 130
+  vlanId: 110
   gateways:
     - address: "10.0.1.1/24"
       routes:
-        - dest: "10.10.10.10/24"
-          src: "none"
+        - dest: 10.10.10.10/24
+          src: none
   pools:
     - name: primary
-      description: "Primary IP pool"
+      description: primary pool
       addresses:
         - "10.0.0.1/24"
       routes:
         - dest: "10.0.1.1/32"
-          src: "self"
+          src: self
           scopeLink: true
         - dest: "10.10.10.10"
           via: "10.0.1.1"

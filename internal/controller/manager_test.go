@@ -81,17 +81,16 @@ func TestManagerFromDaemonSet(t *testing.T) {
 						},
 					},
 				},
-				GatewayIP:        "empty",
-				GatewaySubnet:    -1,
-				LocalRoutes:      []string{},
-				RemoteRoutes:     []string{},
+				Gateways: []vlanmanv1.Gateway{},
+				Mappings: []vlanmanv1.IPMapping{},
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := managerFromSet(tt.daemonSet)
+			result, err := managerFromSet(tt.daemonSet)
+			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedMgr, result)
 		})
 	}
@@ -111,23 +110,43 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					Namespace: "default",
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
-					VlanID:          100,
-					LocalGatewayIP:  "192.168.1.1",
-					LocalSubnet:     []string{"192.168.1.0/24"},
-					RemoteSubnet:    []string{"192.168.2.0/24"},
-					RemoteGatewayIP: "",
+					VlanID: 100,
+					Gateways: []vlanmanv1.Gateway{
+						{
+							Address: "192.168.1.1/24",
+							Routes: []vlanmanv1.Route{
+								{
+									Destination: "192.168.2.0/24",
+									Source:      "self",
+								},
+							},
+						},
+					},
 					ManagerAffinity: nil,
-					Pools:           []vlanmanv1.VlanNetworkPool{},
+					Pools: []vlanmanv1.VlanNetworkPool{
+						{
+							Name:      "default",
+							Addresses: []string{"192.168.1.0/24"},
+						},
+					},
 				},
 			},
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "test-network",
 				VlanID:           100,
 				ManagerAffinity:  nil,
-				LocalRoutes:      []string{"192.168.1.0/24"},
-				GatewayIP:        "192.168.1.1",
-				GatewaySubnet:    32,
-				RemoteRoutes:     []string{"192.168.2.0/24"},
+				Gateways: []vlanmanv1.Gateway{
+					{
+						Address: "192.168.1.1/24",
+						Routes: []vlanmanv1.Route{
+							{
+								Destination: "192.168.2.0/24",
+								Source:      "self",
+							},
+						},
+					},
+				},
+				Mappings: nil,
 			},
 		},
 		{
@@ -138,10 +157,18 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					Namespace: "kube-system",
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
-					VlanID:         200,
-					LocalGatewayIP: "10.0.0.1",
-					LocalSubnet:    []string{"10.0.0.0/16"},
-					RemoteSubnet:   []string{"10.1.0.0/16"},
+					VlanID: 200,
+					Gateways: []vlanmanv1.Gateway{
+						{
+							Address: "10.0.0.1/16",
+							Routes: []vlanmanv1.Route{
+								{
+									Destination: "10.1.0.0/16",
+									Source:      "self",
+								},
+							},
+						},
+					},
 					ManagerAffinity: &corev1.Affinity{
 						NodeAffinity: &corev1.NodeAffinity{
 							RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
@@ -157,6 +184,12 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 									},
 								},
 							},
+						},
+					},
+					Pools: []vlanmanv1.VlanNetworkPool{
+						{
+							Name:      "default",
+							Addresses: []string{"10.0.0.0/16"},
 						},
 					},
 				},
@@ -181,10 +214,18 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 						},
 					},
 				},
-				GatewayIP:        "10.0.0.1",
-				GatewaySubnet:    32,
-				LocalRoutes:      []string{"10.0.0.0/16"},
-				RemoteRoutes:     []string{"10.1.0.0/16"},
+				Gateways: []vlanmanv1.Gateway{
+					{
+						Address: "10.0.0.1/16",
+						Routes: []vlanmanv1.Route{
+							{
+								Destination: "10.1.0.0/16",
+								Source:      "self",
+							},
+						},
+					},
+				},
+				Mappings: nil,
 			},
 		},
 		{
@@ -195,13 +236,20 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
 					VlanID: 42,
+					Pools: []vlanmanv1.VlanNetworkPool{
+						{
+							Name:      "default",
+							Addresses: []string{"10.0.0.0/24"},
+						},
+					},
 				},
 			},
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "minimal-network",
 				VlanID:           42,
 				ManagerAffinity:  nil,
-				GatewaySubnet:    32,
+				Gateways:         nil,
+				Mappings:         nil,
 			},
 		},
 		{
@@ -211,21 +259,43 @@ func TestCreateDesiredManagerSet(t *testing.T) {
 					Name: "zero-vlan-network",
 				},
 				Spec: vlanmanv1.VlanNetworkSpec{
-					VlanID:         0,
-					LocalGatewayIP: "172.16.0.1",
-					LocalSubnet:    []string{"172.16.0.0/12"},
-					RemoteSubnet:   []string{"172.17.0.0/12"},
+					VlanID: 1,
+					Gateways: []vlanmanv1.Gateway{
+						{
+							Address: "172.16.0.1/12",
+							Routes: []vlanmanv1.Route{
+								{
+									Destination: "172.17.0.0/12",
+									Source:      "self",
+								},
+							},
+						},
+					},
 					ManagerAffinity: nil,
+					Pools: []vlanmanv1.VlanNetworkPool{
+						{
+							Name:      "default",
+							Addresses: []string{"172.16.0.0/12"},
+						},
+					},
 				},
 			},
 			expectedManager: ManagerSet{
 				OwnerNetworkName: "zero-vlan-network",
-				VlanID:           0,
+				VlanID:           1,
 				ManagerAffinity:  nil,
-				GatewayIP:        "172.16.0.1",
-				GatewaySubnet:    32,
-				LocalRoutes:      []string{"172.16.0.0/12"},
-				RemoteRoutes:     []string{"172.17.0.0/12"},
+				Gateways: []vlanmanv1.Gateway{
+					{
+						Address: "172.16.0.1/12",
+						Routes: []vlanmanv1.Route{
+							{
+								Destination: "172.17.0.0/12",
+								Source:      "self",
+							},
+						},
+					},
+				},
+				Mappings: nil,
 			},
 		},
 	}

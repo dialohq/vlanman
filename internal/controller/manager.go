@@ -1,10 +1,12 @@
 package controller
 
 import (
+	"encoding/json"
 	"strconv"
 	"strings"
 
 	vlanmanv1 "dialo.ai/vlanman/api/v1"
+	errs "dialo.ai/vlanman/pkg/errors"
 	u "dialo.ai/vlanman/pkg/utils"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -15,10 +17,7 @@ import (
 type ManagerSet struct {
 	OwnerNetworkName string
 	VlanID           int64
-	GatewayIP        string
-	GatewaySubnet    int64
-	LocalRoutes      []string
-	RemoteRoutes     []string
+	Gateways         []vlanmanv1.Gateway
 	ManagerAffinity  *corev1.Affinity
 	Mappings         []vlanmanv1.IPMapping
 }
@@ -36,7 +35,25 @@ func managerCmp(a, b ManagerSet) int {
 	return c
 }
 
-func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
+func daemonSetFromManager(mgr ManagerSet, e Envs) (appsv1.DaemonSet, error) {
+	poolsJSON, err := json.Marshal(mgr.Gateways)
+	if err != nil {
+		return appsv1.DaemonSet{}, &errs.ParsingError{
+			Source: "ManagerSet pools",
+			Err:    err,
+		}
+	}
+	pools := string(poolsJSON)
+
+	gatewaysJSON, err := json.Marshal(mgr.Gateways)
+	if err != nil {
+		return appsv1.DaemonSet{}, &errs.ParsingError{
+			Source: "ManagerSet gateways",
+			Err:    err,
+		}
+	}
+	gateways := string(gatewaysJSON)
+
 	spec := appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      strings.Join([]string{vlanmanv1.ManagerSetNamePrefix, mgr.OwnerNetworkName}, "-"),
@@ -90,20 +107,12 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 									Value: mgr.OwnerNetworkName,
 								},
 								{
-									Name:  "LOCAL_GATEWAY_IP",
-									Value: mgr.GatewayIP,
+									Name:  "POOLS",
+									Value: pools,
 								},
 								{
-									Name:  "LOCAL_GATEWAY_SUBNET",
-									Value: strconv.FormatInt(int64(mgr.GatewaySubnet), 10),
-								},
-								{
-									Name:  "REMOTE_ROUTES",
-									Value: strings.Join(mgr.RemoteRoutes, ","),
-								},
-								{
-									Name:  "LOCAL_ROUTES",
-									Value: strings.Join(mgr.LocalRoutes, ","),
+									Name:  "GATEWAYS",
+									Value: gateways,
 								},
 							},
 							SecurityContext: &corev1.SecurityContext{
@@ -123,7 +132,7 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) appsv1.DaemonSet {
 	if mgr.ManagerAffinity != nil {
 		spec.Spec.Template.Spec.Affinity = mgr.ManagerAffinity
 	}
-	return spec
+	return spec, nil
 }
 
 func serviceForManagerSet(d ManagerSet, namespace string) corev1.Service {
@@ -149,39 +158,21 @@ func serviceForManagerSet(d ManagerSet, namespace string) corev1.Service {
 	}
 }
 
-func managerFromSet(d appsv1.DaemonSet) ManagerSet {
-	// excludedNodes := []string{}
-	// if d.Spec.Template.Spec.Affinity != nil &&
-	// 	d.Spec.Template.Spec.Affinity.NodeAffinity != nil &&
-	// 	d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil &&
-	// 	d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms != nil {
-
-	// 	for _, t := range d.Spec.Template.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms {
-	// 		if len(t.MatchExpressions) != 0 {
-	// 			excludedNodes = append(excludedNodes, t.MatchExpressions[0].Values...)
-	// 		}
-	// 	}
-	// }
+func managerFromSet(d appsv1.DaemonSet) (ManagerSet, error) {
 	managerAffinity := d.Spec.Template.Spec.Affinity
 
 	envs := d.Spec.Template.Spec.Containers[0].Env
 	var vlanID int64 = -1
-	gatewayIP := "empty"
-	var gatewaySubnet int64 = -1
-	remoteRoutes := []string{}
-	localRoutes := []string{}
+	gateways := []vlanmanv1.Gateway{}
 	for _, e := range envs {
 		switch e.Name {
 		case "VLAN_ID":
 			vlanID, _ = strconv.ParseInt(e.Value, 10, 64)
-		case "VLAN_SUBNET":
-			gatewaySubnet, _ = strconv.ParseInt(e.Value, 10, 64)
-		case "VLAN_IP":
-			gatewayIP = e.Value
-		case "REMOTE_ROUTES":
-			remoteRoutes = strings.Split(e.Value, ",")
-		case "LOCAL_ROUTES":
-			localRoutes = strings.Split(e.Value, ",")
+		case "GATEWAYS":
+			err := json.Unmarshal([]byte(e.Value), &gateways)
+			if err != nil {
+				return ManagerSet{}, err
+			}
 		default:
 			continue
 		}
@@ -190,12 +181,10 @@ func managerFromSet(d appsv1.DaemonSet) ManagerSet {
 	return ManagerSet{
 		OwnerNetworkName: d.Labels[vlanmanv1.ManagerSetLabelKey],
 		VlanID:           vlanID,
-		GatewayIP:        gatewayIP,
-		RemoteRoutes:     remoteRoutes,
-		LocalRoutes:      localRoutes,
-		GatewaySubnet:    gatewaySubnet,
 		ManagerAffinity:  managerAffinity,
-	}
+		Mappings:         []vlanmanv1.IPMapping{},
+		Gateways:         gateways,
+	}, nil
 }
 
 func getPullPolicy(pp string) corev1.PullPolicy {
@@ -212,18 +201,10 @@ func getPullPolicy(pp string) corev1.PullPolicy {
 }
 
 func createDesiredManagerSet(network vlanmanv1.VlanNetwork) ManagerSet {
-	gwIP, gwSn, found := strings.Cut(network.Spec.LocalGatewayIP, "/")
-	if !found {
-		gwSn = "32"
-	}
-	gwSnInt, _ := strconv.ParseInt(gwSn, 10, 64)
 	return ManagerSet{
 		OwnerNetworkName: network.Name,
 		VlanID:           int64(network.Spec.VlanID),
-		GatewayIP:        gwIP,
-		RemoteRoutes:     network.Spec.RemoteSubnet,
-		LocalRoutes:      network.Spec.LocalSubnet,
-		GatewaySubnet:    gwSnInt,
+		Gateways:         network.Spec.Gateways,
 		ManagerAffinity:  network.Spec.ManagerAffinity,
 		Mappings:         network.Spec.Mappings,
 	}

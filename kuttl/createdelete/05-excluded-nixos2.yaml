@@ -4,18 +4,23 @@ metadata:
   name: net4
 spec:
   vlanId: 400
-  localSubnet:
-    - "192.168.40.0/24"
-  remoteSubnet:
-    - "192.168.50.0/24"
+  gateways:
+    - address: "10.0.1.1/24"
+      routes:
+        - dest: "10.10.10.10/24"
+          src: "none"
   pools:
     - name: primary
       description: "Primary IP pool"
       addresses:
-        - "192.168.40.10"
-        - "192.168.40.11"
-        - "192.168.40.12"
-  localGatewayIp: "192.168.100.4"
+        - "10.0.0.1/24"
+      routes:
+        - dest: "10.0.1.1/32"
+          src: "self"
+          scopeLink: true
+        - dest: "10.10.10.10"
+          via: "10.0.1.1"
+          src: none
   managerAffinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
