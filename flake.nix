@@ -125,7 +125,6 @@
               mkdir -p final/templates
               cat $src/values.yaml > final/values.yaml
               cat $src/Chart.yaml > final/Chart.yaml
-              cp $src/vlanman-*.tgz final/
 
               cp -aL ${manifests}/. final/templates/
 
@@ -134,7 +133,11 @@
 
               export VERSION=${version}
               perl -pi -e 's|(image:\s*")[^/]+/([^:"]+):[^"]+|\1$ENV{REGISTRY}/\2:$ENV{VERSION}|' final/values.yaml
-              perl -pi -e 's/pullPolicy:\s*Always/pullPolicy: IfNotPresent/g' final/values.yaml
+              ${
+                if version == "dev"
+                then "#"
+                else ""
+              } perl -pi -e 's/pullPolicy:\s*Always/pullPolicy: IfNotPresent/g' final/values.yaml
 
               # version
               yq '.version="${
@@ -204,7 +207,7 @@
             EDITOR = "hx";
           };
         };
-        version = "0.1.5";
+        version = "0.1.6";
       }
     );
 }

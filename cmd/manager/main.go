@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -127,7 +128,7 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cmd := exec.Command("bash", "-c", fmt.Sprintf("lsns | grep %d | awk '{print $4}'", mvr.NsID))
-	PID, err := cmd.Output()
+	PIDs, err := cmd.Output()
 	if err != nil {
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
@@ -136,6 +137,12 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 		}
 		writeError(fmt.Sprintf("Error checking PID of NsID: %s", string(exErr.Stderr)), exErr)
 		return
+	}
+	var PID string
+	if idx := bytes.IndexByte(PIDs, '\n'); idx >= 0 {
+		PID = string(PIDs[:idx])
+	} else {
+		PID = strings.TrimSpace(string(PIDs))
 	}
 
 	cmd = exec.Command("ip", "link", "set", attrs.Name, "netns", strings.TrimSpace(string(PID)))

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -41,27 +42,27 @@ func NewManagerCollector(network string, id int) *ManagerCollector {
 		BytesIn: prometheus.NewDesc(
 			ns+"_bytes_in",
 			"Number of bytes received on the interface",
-			[]string{"interface"}, nil,
+			[]string{"interface", "type", "id"}, nil,
 		),
 		BytesOut: prometheus.NewDesc(
 			ns+"_bytes_out",
 			"Number of bytes sent on the interface",
-			[]string{"interface"}, nil,
+			[]string{"interface", "type", "id"}, nil,
 		),
 		PacketsIn: prometheus.NewDesc(
 			ns+"_packets_in",
 			"Number of packets received on the interface",
-			[]string{"interface"}, nil,
+			[]string{"interface", "type", "id"}, nil,
 		),
 		PacketsOut: prometheus.NewDesc(
 			ns+"_packets_out",
 			"Number of packets sent on the interface",
-			[]string{"interface"}, nil,
+			[]string{"interface", "type", "id"}, nil,
 		),
 		InterfaceState: prometheus.NewDesc(
 			ns+"_interface_state",
 			"State of the interface, value of 1 means 'up'",
-			[]string{"interface", "state"}, nil,
+			[]string{"interface", "state", "type", "id"}, nil,
 		),
 	}
 	prometheus.MustRegister(mc)
@@ -99,30 +100,7 @@ func (mc *ManagerCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func (mc *ManagerCollector) collectDevInfo(dev procfs.NetDevLine, ch chan<- prometheus.Metric) {
-	ch <- prometheus.MustNewConstMetric(
-		mc.BytesIn,
-		prometheus.GaugeValue,
-		float64(dev.RxBytes),
-		dev.Name,
-	)
-	ch <- prometheus.MustNewConstMetric(
-		mc.BytesOut,
-		prometheus.GaugeValue,
-		float64(dev.TxBytes),
-		dev.Name,
-	)
-	ch <- prometheus.MustNewConstMetric(
-		mc.PacketsIn,
-		prometheus.GaugeValue,
-		float64(dev.RxPackets),
-		dev.Name,
-	)
-	ch <- prometheus.MustNewConstMetric(
-		mc.PacketsOut,
-		prometheus.GaugeValue,
-		float64(dev.TxPackets),
-		dev.Name,
-	)
+	vlanID := os.Getenv("VLAN_ID")
 	link, err := netlink.LinkByName(dev.Name)
 	if err != nil {
 		klog.V(4).Infof("Error finding link '%s' by name: %s", dev.Name, err.Error())
@@ -133,10 +111,34 @@ func (mc *ManagerCollector) collectDevInfo(dev procfs.NetDevLine, ch chan<- prom
 		stateValue = 1.0
 	}
 	ch <- prometheus.MustNewConstMetric(
+		mc.BytesIn,
+		prometheus.GaugeValue,
+		float64(dev.RxBytes),
+		dev.Name, link.Type(), vlanID,
+	)
+	ch <- prometheus.MustNewConstMetric(
+		mc.BytesOut,
+		prometheus.GaugeValue,
+		float64(dev.TxBytes),
+		dev.Name, link.Type(), vlanID,
+	)
+	ch <- prometheus.MustNewConstMetric(
+		mc.PacketsIn,
+		prometheus.GaugeValue,
+		float64(dev.RxPackets),
+		dev.Name, link.Type(), vlanID,
+	)
+	ch <- prometheus.MustNewConstMetric(
+		mc.PacketsOut,
+		prometheus.GaugeValue,
+		float64(dev.TxPackets),
+		dev.Name, link.Type(), vlanID,
+	)
+	ch <- prometheus.MustNewConstMetric(
 		mc.InterfaceState,
 		prometheus.GaugeValue,
 		stateValue,
-		dev.Name, link.Attrs().OperState.String(),
+		dev.Name, link.Attrs().OperState.String(), link.Type(), vlanID,
 	)
 }
 
