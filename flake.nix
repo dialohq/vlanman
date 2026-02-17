@@ -7,10 +7,12 @@
     nixidy.url = "github:arnarg/nixidy";
     nix-filter.url = "github:numtide/nix-filter";
     go-cache.url = "github:numtide/build-go-cache";
+    nixpkgsGo.url = "github:nixos/nixpkgs?ref=nixos-25.11";
   };
 
   outputs = {
     nixpkgs,
+    nixpkgsGo,
     flake-utils,
     nixidy,
     nix-filter,
@@ -20,6 +22,10 @@
     flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+        pkgsGo = import nixpkgsGo {
           inherit system;
           config.allowUnfree = true;
         };
@@ -55,8 +61,9 @@
         generate = pkgs.stdenv.mkDerivation {
           name = "generate-manifests";
           src = ./.;
-          buildInputs = [pkgs.kubernetes-controller-tools pkgs.go];
+          buildInputs = [pkgs.kubernetes-controller-tools pkgsGo.go];
           buildPhase = ''
+            export GOTOOLCHAIN=local
             mkdir $TMPDIR/gomodcache $TMPDIR/gobuildcache
             export GOMODCACHE=$TMPDIR/gomodcache
             export GOCACHE=$TMPDIR/gobuildcache
@@ -153,6 +160,18 @@
               cp -r final/* $out/
             '';
           };
+        release = version:
+          pkgs.stdenv.mkDerivation {
+            src = chart;
+            buildPhase = ''
+              cd $src
+              helm package ./
+              helm repo index . --url https://github.com/dialohq/vlanman/releases/download/${version}/ --merge # TODO: change src to ./index.yaml and the other to bulidinputs merge with index from  $src
+              mkdir -p $out
+              cp ipman-*.tgz $out/
+              cp index.yaml $out/
+            '';
+          };
       in rec {
         nixidyEnvs = nixidy.lib.mkEnvs {
           inherit pkgs;
@@ -207,7 +226,7 @@
             EDITOR = "hx";
           };
         };
-        version = "0.1.6";
+        version = "dev";
       }
     );
 }
