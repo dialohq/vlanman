@@ -228,7 +228,7 @@
             EDITOR = "hx";
           };
         };
-        version = "dev";
+        version = "0.1.7";
       }
     );
 }
