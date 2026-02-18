@@ -71,20 +71,21 @@ func main() {
 	}
 
 	e := controller.Envs{
-		NamespaceName:            os.Getenv("NAMESPACE_NAME"),
-		IsMonitoringEnabled:      os.Getenv("MONITORING_ENABLED") == "true",
-		MonitoringScrapeInterval: os.Getenv("MONITORING_SCRAPE_INTERVAL"),
-		MonitoringReleaseName:    os.Getenv("MONITORING_RELEASE_NAME"),
-		VlanManagerImage:         os.Getenv("MANAGER_POD_IMAGE"),
-		VlanManagerPullPolicy:    os.Getenv("MANAGER_PULL_POLICY"),
-		InterfacePodImage:        os.Getenv("INTERFACE_POD_IMAGE"),
-		InterfacePodPullPolicy:   os.Getenv("INTERFACE_PULL_POLICY"),
-		WorkerInitImage:          os.Getenv("WORKER_IMAGE"),
-		WorkerInitPullPolicy:     os.Getenv("WORKER_PULL_POLICY"),
-		ServiceAccountName:       os.Getenv("SERVICE_ACCOUNT_NAME"),
-		WaitForPodTimeoutSeconds: podTimeout,
-		TTL:                      ttl,
-		IsTest:                   false,
+		NamespaceName:                os.Getenv("NAMESPACE_NAME"),
+		IsMonitoringEnabled:          os.Getenv("MONITORING_ENABLED") == "true",
+		IsManagerIPMonitoringEnabled: os.Getenv("MANAGER_IP_MONITORING_ENABLED") == "true",
+		MonitoringScrapeInterval:     os.Getenv("MONITORING_SCRAPE_INTERVAL"),
+		MonitoringReleaseName:        os.Getenv("MONITORING_RELEASE_NAME"),
+		VlanManagerImage:             os.Getenv("MANAGER_POD_IMAGE"),
+		VlanManagerPullPolicy:        os.Getenv("MANAGER_PULL_POLICY"),
+		InterfacePodImage:            os.Getenv("INTERFACE_POD_IMAGE"),
+		InterfacePodPullPolicy:       os.Getenv("INTERFACE_PULL_POLICY"),
+		WorkerInitImage:              os.Getenv("WORKER_IMAGE"),
+		WorkerInitPullPolicy:         os.Getenv("WORKER_PULL_POLICY"),
+		ServiceAccountName:           os.Getenv("SERVICE_ACCOUNT_NAME"),
+		WaitForPodTimeoutSeconds:     podTimeout,
+		TTL:                          ttl,
+		IsTest:                       false,
 	}
 	if e.IsMonitoringEnabled {
 		logger.Info("Enabling monitoring", "release", e.MonitoringReleaseName)

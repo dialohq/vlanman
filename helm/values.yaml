@@ -7,6 +7,7 @@ global:
     enabled: false
     interval: 5s
     release: kube-prometheus-stack
+  managerIPMonitoring: false
 # Controller (operator) configuration
 controller:
   podTimeoutSeconds: 60

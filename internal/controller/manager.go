@@ -129,6 +129,23 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) (appsv1.DaemonSet, error) {
 			},
 		},
 	}
+	if e.IsManagerIPMonitoringEnabled {
+		spec.Spec.Template.Spec.Containers = append(spec.Spec.Template.Spec.Containers, corev1.Container{
+			Name:            vlanmanv1.ManagerIPMonitorContainerName,
+			Image:           "alpine:latest",
+			ImagePullPolicy: "IfNotPresent",
+			Command:         []string{"sh", "-c", "apk add --no-cache iproute2 && /sbin/ip monitor all"},
+			SecurityContext: &corev1.SecurityContext{
+				Capabilities: &corev1.Capabilities{
+					Add: []corev1.Capability{
+						"NET_ADMIN",
+						"NET_RAW",
+					},
+				},
+			},
+		},
+		)
+	}
 	if mgr.ManagerAffinity != nil {
 		spec.Spec.Template.Spec.Affinity = mgr.ManagerAffinity
 	}

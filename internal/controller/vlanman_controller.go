@@ -35,20 +35,21 @@ import (
 
 // Envs holds environment configuration values for the IPSec controller
 type Envs struct {
-	NamespaceName            string
-	VlanManagerImage         string
-	VlanManagerPullPolicy    string
-	IsTest                   bool
-	WaitForPodTimeoutSeconds int64
-	IsMonitoringEnabled      bool
-	MonitoringScrapeInterval string
-	MonitoringReleaseName    string
-	TTL                      *int32
-	InterfacePodImage        string
-	InterfacePodPullPolicy   string
-	WorkerInitImage          string
-	WorkerInitPullPolicy     string
-	ServiceAccountName       string
+	NamespaceName                string
+	VlanManagerImage             string
+	VlanManagerPullPolicy        string
+	IsTest                       bool
+	WaitForPodTimeoutSeconds     int64
+	IsManagerIPMonitoringEnabled bool
+	IsMonitoringEnabled          bool
+	MonitoringScrapeInterval     string
+	MonitoringReleaseName        string
+	TTL                          *int32
+	InterfacePodImage            string
+	InterfacePodPullPolicy       string
+	WorkerInitImage              string
+	WorkerInitPullPolicy         string
+	ServiceAccountName           string
 }
 
 type VlanmanReconciler struct {

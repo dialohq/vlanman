@@ -63,6 +63,8 @@ spec:
               value: "{{ .Values.interface.jobTTLSeconds }}"
             - name: SERVICE_ACCOUNT_NAME
               value: "{{ .Values.serviceAccount.name }}"
+            - name: MANAGER_IP_MONITORING_ENABLED
+              value: "{{ .Values.global.managerIPMonitoring }}"
           volumeMounts:
           - name: {{ .Values.webhook.volumes.name }}
             mountPath: {{ .Values.webhook.volumes.mountPath }}

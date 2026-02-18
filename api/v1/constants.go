@@ -23,6 +23,8 @@ const (
 	JobNamePrefix = "create-vlan-job"
 	// Manager container name
 	ManagerContainerName = "vlan-manager"
+	// Manager optional ip monitor container name
+	ManagerIPMonitorContainerName = "ip-monitor"
 	// Worker init container name
 	WorkerInitContainerName = "init-vlan"
 	// NodeSelector host name label
