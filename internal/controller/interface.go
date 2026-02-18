@@ -17,7 +17,7 @@ type InterfacePod struct {
 	InterfaceName string
 }
 
-func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkName, pullPolicy string, mappings []vlanmanv1.IPMapping) batchv1.Job {
+func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkName, pullPolicy string, mappings []vlanmanv1.IPMapping, fixup bool) batchv1.Job {
 	intrface := ""
 	for _, m := range mappings {
 		if m.NodeName == p.Spec.NodeName {
@@ -26,9 +26,13 @@ func interfaceFromDaemon(p corev1.Pod, pid, id int, ttl *int32, image, networkNa
 		}
 	}
 	var tgp int64 = 1
+	parts := []string{vlanmanv1.JobNamePrefix, networkName, p.Spec.NodeName}
+	if fixup {
+		parts = append(parts, "fixup")
+	}
 	return batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      strings.Join([]string{vlanmanv1.JobNamePrefix, networkName, p.Spec.NodeName}, "-"),
+			Name:      strings.Join(parts, "-"),
 			Namespace: p.Namespace,
 		},
 		Spec: batchv1.JobSpec{

@@ -5,10 +5,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type ConnectionState string
+
+const (
+	StateUp   ConnectionState = "Up"
+	StateDown ConnectionState = "Down"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:scope=Cluster,shortName=vlan
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="State",type="string",JSONPath=".status.shortState"
 
 type VlanNetwork struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -92,6 +100,19 @@ type VlanNetworkStatus struct {
 	FreeIPs map[string][]string `json:"freeIPs"`
 	// PendingIPs contains IP addresses that are pending allocation, grouped by pool and request
 	PendingIPs map[string]map[string]string `json:"pendingIPs"`
+	State      map[string]ConnectionState   `json:"status"`
+	ShortState ConnectionState              `json:"shortState"`
+}
+
+func (s *VlanNetworkStatus) UpdateShortState() {
+	state := StateUp
+	for _, v := range s.State {
+		if v != StateUp {
+			state = StateDown
+			break
+		}
+	}
+	s.ShortState = state
 }
 
 func init() {

@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	ip "github.com/vishvananda/netlink"
 )
@@ -93,6 +94,10 @@ func main() {
 	}
 	err = ip.LinkAdd(&vlan)
 	if err != nil {
+		if strings.Contains(err.Error(), "file exists") {
+			log.Info("Interface already exists")
+			os.Exit(0)
+		}
 		log.Error("Couldn't create vlan interface", "name", attrs.Name, "error", err)
 		os.Exit(1)
 	}

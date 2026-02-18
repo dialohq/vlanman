@@ -160,18 +160,19 @@
               cp -r final/* $out/
             '';
           };
-        release = version:
-          pkgs.stdenv.mkDerivation {
-            src = chart;
-            buildPhase = ''
-              cd $src
-              helm package ./
-              helm repo index . --url https://github.com/dialohq/vlanman/releases/download/${version}/ --merge # TODO: change src to ./index.yaml and the other to bulidinputs merge with index from  $src
-              mkdir -p $out
-              cp ipman-*.tgz $out/
-              cp index.yaml $out/
-            '';
-          };
+        # release = version:
+        #   pkgs.stdenv.mkDerivation {
+        #     src = chart;
+        #     name = "release";
+        #     buildPhase = ''
+        #       cd $src
+        #       helm package ./
+        #       helm repo index . --url https://github.com/dialohq/vlanman/releases/download/${version}/ --merge # TODO: change src to ./index.yaml and the other to bulidinputs merge with index from  $src
+        #       mkdir -p $out
+        #       cp ipman-*.tgz $out/
+        #       cp index.yaml $out/
+        #     '';
+        #   };
       in rec {
         nixidyEnvs = nixidy.lib.mkEnvs {
           inherit pkgs;
@@ -185,6 +186,7 @@
           chart = chart version;
           nixidy = nixidy.packages.${system}.default;
           operator = operator version;
+          # release = release version;
         };
         devShells.default = pkgs.mkShell {
           packages = [

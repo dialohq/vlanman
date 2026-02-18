@@ -87,12 +87,30 @@ func (e *ReconcileErrorList) Error() string {
 	return msg
 }
 
-func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, error) {
+func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, []VlanNetworkState, error) {
+	vlans := vlanmanv1.VlanNetworkList{}
+	err := r.Client.List(ctx, &vlans)
+	if err != nil {
+		return nil, nil, &errs.ClientRequestError{
+			Action: "List vlan networks",
+			Err:    err,
+		}
+	}
+	connStates := make([]VlanNetworkState, len(vlans.Items))
+	for _, conn := range vlans.Items {
+		connStates = append(connStates, VlanNetworkState{
+			Status:      conn.Status.State,
+			VlanId:      conn.Spec.VlanID,
+			Mappings:    conn.Spec.Mappings,
+			NetworkName: conn.Name,
+		})
+	}
+
 	managers := appsv1.DaemonSetList{}
 	selector := labels.NewSelector()
 	requirement, err := labels.NewRequirement(vlanmanv1.ManagerSetLabelKey, "exists", nil)
 	if err != nil {
-		return nil, &errs.InternalError{
+		return nil, nil, &errs.InternalError{
 			Context: fmt.Sprintf("Error creating a label selector requirement in createDesiredState: %s", err.Error()),
 		}
 	}
@@ -102,21 +120,22 @@ func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, 
 	}
 	err = r.Client.List(ctx, &managers, &opts)
 	if err != nil {
-		return nil, &errs.ClientRequestError{
+		return nil, nil, &errs.ClientRequestError{
 			Action: "List pods with field selector",
 			Err:    err,
 		}
 	}
+
 	// TODO: check if interfaces are created
 	mgrs := []ManagerSet{}
 	for _, m := range managers.Items {
 		newMgr, err := managerFromSet(m)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		mgrs = append(mgrs, newMgr)
 	}
-	return mgrs, nil
+	return mgrs, connStates, nil
 }
 
 func (r *VlanmanReconciler) createDesiredState(networks []vlanmanv1.VlanNetwork) []ManagerSet {
@@ -140,8 +159,21 @@ func (r *VlanmanReconciler) diffManagers(desired, current ManagerSet) []Action {
 	return []Action{}
 }
 
-func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet) []Action {
+func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet, currentConns []VlanNetworkState) []Action {
 	acts := []Action{}
+
+	for _, conn := range currentConns {
+		for podName, podStatus := range conn.Status {
+			if podStatus != vlanmanv1.StateUp {
+				acts = append(acts, &SpawnInterfaceAction{
+					PodName:     podName,
+					VlanId:      conn.VlanId,
+					Mappings:    conn.Mappings,
+					NetworkName: conn.NetworkName,
+				})
+			}
+		}
+	}
 
 	// sort for searching
 	slices.SortFunc(desired, managerCmp)
@@ -181,12 +213,12 @@ func (r *VlanmanReconciler) reconcileNetwork(ctx context.Context) (*time.Duratio
 
 	desired := r.createDesiredState(networkList.Items)
 
-	current, err := r.getCurrentState(ctx)
+	currentMgrs, currentConns, err := r.getCurrentState(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	actions := r.diffStates(desired, current)
+	actions := r.diffStates(desired, currentMgrs, currentConns)
 
 	for _, action := range actions {
 		log.Info("Doing action", "type", reflect.TypeOf(action))
@@ -239,6 +271,9 @@ func (r *VlanmanReconciler) updateVlanNetworkStatus(ctx context.Context, net *vl
 	}
 	if net.Status.PendingIPs == nil {
 		net.Status.PendingIPs = map[string]map[string]string{}
+	}
+	if net.Status.State == nil {
+		net.Status.State = map[string]vlanmanv1.ConnectionState{}
 	}
 
 	for name := range net.Status.FreeIPs {
@@ -361,7 +396,6 @@ func (r *VlanmanReconciler) UpdateAllNetworkStatus(ctx context.Context) (*time.D
 }
 
 func (r *VlanmanReconciler) ensurePodMonitor(ctx context.Context) error {
-	prtNum := int32(vlanmanv1.ManagerPodAPIPort)
 	prtName := vlanmanv1.ManagerPodAPIPortName
 	err := r.Client.Create(ctx, &promv1.PodMonitor{
 		ObjectMeta: metav1.ObjectMeta{
@@ -380,10 +414,9 @@ func (r *VlanmanReconciler) ensurePodMonitor(ctx context.Context) error {
 			}},
 			PodMetricsEndpoints: []promv1.PodMetricsEndpoint{
 				{
-					Port:       &prtName,
-					PortNumber: &prtNum,
-					Path:       "/metrics",
-					Interval:   promv1.Duration(r.Env.MonitoringScrapeInterval),
+					Port:     &prtName,
+					Path:     "/metrics",
+					Interval: promv1.Duration(r.Env.MonitoringScrapeInterval),
 				},
 			},
 		},

@@ -98,7 +98,7 @@ func (v *VlanmanPodCustomDefaulter) Default(ctx context.Context, obj runtime.Obj
 	found := false
 	var assignedIP *string = nil
 	for _, IP := range pool {
-		if slices.Contains(slices.Collect(maps.Values(pendingMap)), IP) {
+		if slices.Contains(slices.Collect(maps.Keys(pendingMap)), IP) {
 			continue
 		}
 		found = true

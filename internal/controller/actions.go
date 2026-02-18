@@ -216,39 +216,11 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			}
 		}
 
-		resp, err := http.Get(fmt.Sprintf("http://%s:61410/pid", pod.Status.PodIP))
+		pid, err := requestManagerPID(pod.Status.PodIP)
 		if err != nil {
-			return &errs.RequestError{
-				Action: "Get PID",
-				Err:    err,
-			}
+			return err
 		}
-
-		if resp == nil || resp.Body == nil {
-			return &errs.RequestError{
-				Action: "Get PID",
-				Err:    fmt.Errorf("response or response body is nil"),
-			}
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return &errs.ParsingError{
-				Source: "CreatemanagerAction/CreateJob/ReadBodyPIDResponse",
-				Err:    err,
-			}
-		}
-
-		PID := &comms.PIDResponse{}
-		err = json.Unmarshal(body, PID)
-		if err != nil {
-			return &errs.ParsingError{
-				Source: "CreatemanagerAction/CreateJob/UnmarshalBodyPIDResponse",
-				Err:    err,
-			}
-		}
-
-		job := interfaceFromDaemon(pod, PID.PID, int(a.Manager.VlanID), r.Env.TTL, r.Env.InterfacePodImage, a.Manager.OwnerNetworkName, r.Env.InterfacePodPullPolicy, a.Manager.Mappings)
+		job := interfaceFromDaemon(pod, pid, int(a.Manager.VlanID), r.Env.TTL, r.Env.InterfacePodImage, a.Manager.OwnerNetworkName, r.Env.InterfacePodPullPolicy, a.Manager.Mappings, false)
 		err = r.Client.Create(ctx, &job)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
@@ -309,7 +281,7 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 				}
 			}
 		}
-		resp, err = http.Get(fmt.Sprintf("http://%s:61410", pod.Status.PodIP))
+		resp, err := http.Get(fmt.Sprintf("http://%s:61410", pod.Status.PodIP))
 		if err != nil {
 			return &errs.RequestError{
 				Action: "CheckDaemonReady",
@@ -336,6 +308,14 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			time.Sleep(time.Second / 2)
 			tries += 1
 		}
+		vlan := vlanmanv1.VlanNetwork{}
+		err = r.Client.Get(ctx, types.NamespacedName{Name: a.Manager.OwnerNetworkName, Namespace: ""}, &vlan)
+		if vlan.Status.State == nil {
+			vlan.Status.State = make(map[string]vlanmanv1.ConnectionState)
+		}
+		vlan.Status.State[pod.Name] = vlanmanv1.StateUp
+		vlan.Status.UpdateShortState()
+		r.Client.Status().Update(ctx, &vlan)
 	}
 	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
 	err = r.Client.Create(ctx, &svc)
@@ -386,4 +366,160 @@ type ThrowErrorAction struct {
 
 func (a *ThrowErrorAction) Do(ctx context.Context, r *VlanmanReconciler) error {
 	return a.Err
+}
+
+type SpawnInterfaceAction struct {
+	PodName     string
+	VlanId      int
+	Mappings    []vlanmanv1.IPMapping
+	NetworkName string
+}
+
+func (a *SpawnInterfaceAction) Do(ctx context.Context, r *VlanmanReconciler) error {
+	log := log.FromContext(ctx)
+	pod := corev1.Pod{}
+	podNsn := types.NamespacedName{Name: a.PodName, Namespace: r.Env.NamespaceName}
+	err := r.Client.Get(ctx, podNsn, &pod)
+	if err != nil {
+		return errs.NewClientRequestError(fmt.Sprintf("Get pod %s@%s", a.PodName, r.Env.NamespaceName), err)
+	}
+	for len(pod.Status.PodIP) == 0 {
+		time.Sleep(1 * time.Second)
+		err = r.Client.Get(ctx, podNsn, &pod)
+		if err != nil {
+			return errs.NewClientRequestError("Get pod in spawn interface action", err)
+		}
+	}
+	pid, err := requestManagerPID(pod.Status.PodIP)
+	if err != nil {
+		return err
+	}
+
+	log.Info("Creating job", "target", pod.Name)
+	job := interfaceFromDaemon(pod, pid, int(a.VlanId), r.Env.TTL, r.Env.InterfacePodImage, a.NetworkName, r.Env.InterfacePodPullPolicy, a.Mappings, true)
+	err = r.Client.Create(ctx, &job)
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			existingJob := batchv1.Job{}
+			err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+			if err != nil {
+				return errs.NewClientRequestError("Get conflicting job", err)
+			}
+			// wait for job to complete
+			tries := 1
+			for existingJob.Status.Active != 0 && tries <= 30 {
+				log.Info("Waiting for conflicting job to finish", "job", existingJob.Name, "activeItems", existingJob.Status.Active, "tries", fmt.Sprintf("%d/%d", tries, 30))
+				time.Sleep(time.Second)
+				err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+				if err != nil {
+					return errs.NewClientRequestError("Get conflicting job", err)
+				}
+				tries += 1
+			}
+			log.Info("Deleting conflicting job", "job", existingJob.Name)
+			// Delete pods created by this job as well
+			pp := metav1.DeletePropagationBackground
+			err = r.Client.Delete(ctx, &existingJob, &client.DeleteOptions{
+				PropagationPolicy: &pp,
+			})
+			if err != nil {
+				return errs.NewClientRequestError("Delete conflicting job after it finished", err)
+			}
+			err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return errs.NewClientRequestError("Get conflicting job", err)
+			}
+
+			jobDeleted := apierrors.IsNotFound(err)
+			tries = 0
+			for !jobDeleted && tries <= 30 {
+				log.Info("Waiting for conflicting job to delete", "job", existingJob.Name, "activeItems", existingJob.Status.Active, "tries", fmt.Sprintf("%d/%d", tries, 30))
+				time.Sleep(time.Second)
+				err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &existingJob)
+				if err != nil && !apierrors.IsNotFound(err) {
+					return errs.NewClientRequestError("Get conflicting job while waiting for delete", err)
+				}
+				if apierrors.IsNotFound(err) {
+					jobDeleted = true
+				}
+				tries += 1
+			}
+			log.Info("Conflicting job deleted successfully, trying to create again...")
+			err = r.Client.Create(ctx, &job)
+			if err != nil {
+				return errs.NewClientRequestError("Create job after deleting conflicting one", err)
+			}
+		} else {
+			return &errs.ClientRequestError{
+				Action: "Create job",
+				Err:    err,
+			}
+		}
+	}
+
+	tries := 0
+	for job.Status.Active != 0 && tries <= 30 {
+		log.Info("Waiting for conflicting job to finish", "job", job.Name, "activeItems", job.Status.Active, "tries", fmt.Sprintf("%d/%d", tries, 30))
+		time.Sleep(time.Second)
+		err = r.Client.Get(ctx, types.NamespacedName{Name: job.Name, Namespace: job.Namespace}, &job)
+		if err != nil {
+			return errs.NewClientRequestError("Get running job", err)
+		}
+		tries += 1
+	}
+	log.Info("Job finished")
+	if tries == 31 {
+		return &errs.InternalError{
+			Context: fmt.Sprintf("Error waiting for vlan interface creation job to complete on manager: %s", pod.Name),
+		}
+	}
+	vlan := vlanmanv1.VlanNetwork{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: a.NetworkName, Namespace: ""}, &vlan)
+	if err != nil {
+		return errs.NewClientRequestError(fmt.Sprintf("Get vlan network %s", a.NetworkName), err)
+	}
+	if vlan.Status.State == nil {
+		vlan.Status.State = make(map[string]vlanmanv1.ConnectionState)
+	}
+	vlan.Status.State[a.PodName] = vlanmanv1.StateUp
+	vlan.Status.UpdateShortState()
+	err = r.Client.Status().Update(ctx, &vlan)
+	if err != nil {
+		return errs.NewClientRequestError(fmt.Sprintf("Update status of vlan network %s", a.NetworkName), err)
+	}
+	return nil
+}
+
+func requestManagerPID(IP string) (int, error) {
+	resp, err := http.Get(fmt.Sprintf("http://%s:61410/pid", IP))
+	if err != nil {
+		return 0, &errs.RequestError{
+			Action: "Get PID",
+			Err:    err,
+		}
+	}
+	if resp == nil || resp.Body == nil {
+		return 0, &errs.RequestError{
+			Action: "Get PID",
+			Err:    fmt.Errorf("response or response body is nil"),
+		}
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, &errs.ParsingError{
+			Source: "CreatemanagerAction/CreateJob/ReadBodyPIDResponse",
+			Err:    err,
+		}
+	}
+
+	PID := &comms.PIDResponse{}
+	err = json.Unmarshal(body, PID)
+	if err != nil {
+		return 0, &errs.ParsingError{
+			Source: "CreatemanagerAction/CreateJob/UnmarshalBodyPIDResponse",
+			Err:    err,
+		}
+	}
+	return PID.PID, nil
 }

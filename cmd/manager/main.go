@@ -28,10 +28,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/procfs"
 	ip "github.com/vishvananda/netlink"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/leaderelection"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var logger slog.Logger
@@ -87,13 +91,16 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 		writeError("Couldn't unmarshal request body", errs.NewParsingError("request body", err))
 		return
 	}
+	logger.Info("Received request for macvlan", "nsid", mvr.NsID)
 
 	linkName := "vlan" + strconv.FormatInt(int64(vlanID), 10)
+	logger.Info("Looking for link by name", "name", linkName)
 	vlan, err := ip.LinkByName(linkName)
 	if err != nil {
 		writeError(fmt.Sprintf("Couldn't find link '%s' by name", linkName), errs.ErrUnrecoverable)
 		return
 	}
+	logger.Info("Found link by name", "name", linkName)
 
 	attrs := ip.NewLinkAttrs()
 	attrs.Name = "macvlan" + strconv.FormatInt(int64(vlanID), 10)
@@ -102,24 +109,31 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 		LinkAttrs: attrs,
 		Mode:      ip.MACVLAN_MODE_BRIDGE,
 	}
+	logger.Info("Looking for link by name", "name", attrs.Name)
 	link, err := ip.LinkByName(attrs.Name)
 	if err == nil {
+		logger.Info("Link found, deleting", "name", attrs.Name)
 		err = ip.LinkDel(link)
 		if err != nil {
 			writeError("Found existing link but error deleting", &errs.UnrecoverableError{Context: "Cleaning up (deleting link)", Err: err})
 			return
 		}
+		logger.Info("Link deleted successfully", "name", attrs.Name)
 	}
+
+	logger.Info("Adding new link", "name", attrs.Name)
 	err = ip.LinkAdd(&macvlan)
 	if err != nil {
 		writeError(fmt.Sprintf("Couldn't create macvlan interface '%s'", attrs.Name), err)
 		return
 	}
 
+	logger.Info("Setting link state to up", "link", attrs.Name)
 	err = ip.LinkSetUp(&macvlan)
 	if err != nil {
-		logger.Error("Couldn't set macvlan interface up", "msg", err)
+		logger.Error("Couldn't set macvlan interface up", "msg", err, "link", attrs.Name)
 		if err = ip.LinkDel(&macvlan); err != nil {
+			logger.Error("Couldn't clean up macvlan interface after failure", "name", attrs.Name)
 			writeError(fmt.Sprintf("Couldn't set macvlan interface '%s' up. Cleanup failed.", attrs.Name), err)
 			return
 		}
@@ -127,9 +141,11 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Info("Looking for nsid", "nsid", mvr.NsID)
 	cmd := exec.Command("bash", "-c", fmt.Sprintf("lsns | grep %d | awk '{print $4}'", mvr.NsID))
 	PIDs, err := cmd.Output()
 	if err != nil {
+		logger.Error("Failed to find nsid", "nsid", mvr.NsID)
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
 			writeError("Unknown exit error while getting PID of NsID", err)
@@ -144,11 +160,21 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 	} else {
 		PID = strings.TrimSpace(string(PIDs))
 	}
+	logger.Info("Found PID", "PID", PID)
 
-	cmd = exec.Command("ip", "link", "set", attrs.Name, "netns", strings.TrimSpace(string(PID)))
+	logger.Info("Setting netns of link", "link", attrs.Name, "netns", PID)
+	args := []string{"link", "set", attrs.Name, "netns", strings.TrimSpace(string(PID))}
+	cmd = exec.Command("ip", args...)
 	out, err = cmd.Output()
 	if err != nil {
 		exErr, ok := err.(*exec.ExitError)
+		commandSlice := append([]string{"ip"}, args...)
+		logger.Error("Error executing command",
+			"command", strings.Join(commandSlice, " "),
+			"output", out,
+			"err", err,
+			"exErr", exErr,
+		)
 		if !ok {
 			writeError("Unknown exit error while setting ns", err)
 			return
@@ -158,6 +184,7 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	logger.Info("Set NetNS successfully")
 	resp := comms.MacvlanResponse{
 		Id: envs.vlanID,
 	}
@@ -276,6 +303,15 @@ func setupRoutes() error {
 	return nil
 }
 
+// func listenForInterfaceChange() {
+
+// 	hostname, err := os.Hostname()
+// 	if err != nil {
+// 		panic(fmt.Sprintf("Couldn't get hostname: %s", err))
+// 	}
+
+// }
+
 func begin() context.Context {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
@@ -362,8 +398,16 @@ func getValues() (int64, *time.Time) {
 	return cnt, &change
 }
 
-func interfaceSetup(ctx context.Context, e Envs) {
-	err := vlanWatcher.Watch()
+func interfaceSetup(ctx context.Context, e Envs, k8sclient client.Client) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(fmt.Sprintf("Couldn't get hostname: %s", err))
+	}
+	downgrade := func() {
+		downgradeStatus(k8sclient, ctx, logger, envs.ownerNetName, hostname)
+	}
+
+	err = vlanWatcher.Watch(downgrade, logger)
 	if err != nil {
 		logger.Error("Error creating vlan watcher", "msg", &errs.UnrecoverableError{Context: "Couldn't create a vlan watcher", Err: err})
 		os.Exit(1)
@@ -418,11 +462,6 @@ func interfaceSetup(ctx context.Context, e Envs) {
 	gatewayLink = &macvlan
 
 	cfg := ctrl.GetConfigOrDie()
-	hostname, err := os.Hostname()
-	if err != nil {
-		logger.Error("failed to find hostname", "msg", err)
-		os.Exit(1)
-	}
 	l, err := rl.NewFromKubeconfig(
 		rl.LeasesResourceLock,
 		e.namespace,
@@ -470,14 +509,58 @@ func (pl *PrometheusLogger) Println(args ...any) {
 
 var _ promhttp.Logger = &PrometheusLogger{}
 
+func createK8sClient() (k8sclient client.Client, ctx context.Context, ctxCancel context.CancelFunc, err error) {
+	ctx, ctxCancel = context.WithCancel(context.Background())
+	config, err := rest.InClusterConfig()
+	scheme := runtime.NewScheme()
+	_ = vlanmanv1.AddToScheme(scheme)
+
+	if err != nil {
+		err = fmt.Errorf("Error creating config for k8s client: %s", err)
+		return
+	}
+	k8sclient, err = client.New(config, client.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		err = fmt.Errorf("Error creating k8s client: %s", err)
+		return
+	}
+	return
+}
+
+func downgradeStatus(k8sclient client.Client, ctx context.Context, logger slog.Logger, ownerName, hostname string) {
+	connection := vlanmanv1.VlanNetwork{}
+	err := k8sclient.Get(ctx, types.NamespacedName{Name: ownerName, Namespace: ""}, &connection)
+	if err != nil {
+		logger.Error("Unable to get vlan connection CR for status update", "err", err, "name", ownerName)
+		return
+	}
+
+	if connection.Status.State == nil {
+		connection.Status.State = make(map[string]vlanmanv1.ConnectionState)
+	}
+	connection.Status.State[hostname] = vlanmanv1.StateDown
+	connection.Status.ShortState = vlanmanv1.StateDown
+	err = k8sclient.Status().Update(ctx, &connection)
+	if err != nil {
+		logger.Error("Failed to update vlan connections tatus", "err", err)
+	}
+}
+
 func main() {
 	logger = *slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	ctx := begin()
 
+	k8sclient, ctx, _, err := createK8sClient()
+	if err != nil {
+		panic(fmt.Sprintf("Unable to create k8s client: %s", err))
+	}
+
 	envs = getEnvs()
 	vlanWatcher = NewWatcher(envs.vlanID)
 
-	go interfaceSetup(ctx, envs)
+	go interfaceSetup(ctx, envs, k8sclient)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pid", pid)

@@ -1,9 +1,12 @@
 package controller
 
-type ClusterState struct {
-	Nodes map[string]Node
-}
+import (
+	vlanmanv1 "dialo.ai/vlanman/api/v1"
+)
 
-type Node struct {
-	Managers map[string]ManagerSet // per network name
+type VlanNetworkState struct {
+	Status      map[string]vlanmanv1.ConnectionState
+	VlanId      int
+	NetworkName string
+	Mappings    []vlanmanv1.IPMapping
 }

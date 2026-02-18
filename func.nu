@@ -1,5 +1,5 @@
 print "Uninstalling vm"
-helm list -o json | from json | where name =~ "vm" | get name | each {|it| helm uninstall $it}
+try { helm list -o json | from json | where name =~ "vm" | get name | each {|it| helm uninstall $it} }
 try {
 kubectl delete -f samples/10.yaml -f samples/20.yaml -f samples/pod10.yaml -f samples/2pod10.yaml  -f samples/3pod10.yaml -f samples/pod20.yaml -f samples/2pod20.yaml -f samples/3pod20.yaml
 }
