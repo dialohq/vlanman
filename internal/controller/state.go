@@ -5,8 +5,8 @@ import (
 )
 
 type VlanNetworkState struct {
-	Status      map[string]vlanmanv1.ConnectionState
-	VlanId      int
-	NetworkName string
-	Mappings    []vlanmanv1.IPMapping
+	Status   map[string]vlanmanv1.ConnectionState
+	Mappings []vlanmanv1.IPMapping
+	VlanId   int
+	Name     string
 }

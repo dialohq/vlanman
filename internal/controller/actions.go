@@ -85,11 +85,11 @@ type Action interface {
 }
 
 type CreateManagerAction struct {
-	Manager ManagerSet
+	OwnerNetwork VlanNetworkState
+	Manager      ManagerSet
 }
 
 func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) error {
-	log := log.FromContext(ctx)
 	daemonSet, err := daemonSetFromManager(a.Manager, r.Env)
 	if err != nil {
 		return &errs.UnrecoverableError{
@@ -97,7 +97,13 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			Err:     err,
 		}
 	}
-	err = r.Client.Create(ctx, &daemonSet)
+	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
+	return a.execute(ctx, r, daemonSet, svc)
+}
+
+func (a *CreateManagerAction) execute(ctx context.Context, r *VlanmanReconciler, daemonSet appsv1.DaemonSet, svc corev1.Service) error {
+	log := log.FromContext(ctx)
+	err := r.Client.Create(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
 			Action: "Create daemonset",
@@ -317,7 +323,6 @@ func (a *CreateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		vlan.Status.UpdateShortState()
 		r.Client.Status().Update(ctx, &vlan)
 	}
-	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
 	err = r.Client.Create(ctx, &svc)
 	if err != nil {
 		return &errs.ClientRequestError{
@@ -340,8 +345,12 @@ func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 			Err:     err,
 		}
 	}
+	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
+	return a.execute(ctx, r, daemonSet, svc)
+}
 
-	err = r.Client.Delete(ctx, &daemonSet)
+func (a *DeleteManagerAction) execute(ctx context.Context, r *VlanmanReconciler, daemonSet appsv1.DaemonSet, svc corev1.Service) error {
+	err := r.Client.Delete(ctx, &daemonSet)
 	if err != nil {
 		return &errs.ClientRequestError{
 			Action: "Delete daemonset",
@@ -349,7 +358,6 @@ func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 		}
 	}
 
-	svc := serviceForManagerSet(a.Manager, r.Env.NamespaceName)
 	err = r.Client.Delete(ctx, &svc)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return &errs.ClientRequestError{
@@ -360,23 +368,12 @@ func (a *DeleteManagerAction) Do(ctx context.Context, r *VlanmanReconciler) erro
 	return nil
 }
 
-type ThrowErrorAction struct {
-	Err error
-}
-
-func (a *ThrowErrorAction) Do(ctx context.Context, r *VlanmanReconciler) error {
-	return a.Err
-}
-
 type SpawnInterfaceAction struct {
-	PodName     string
-	VlanId      int
-	Mappings    []vlanmanv1.IPMapping
-	NetworkName string
+	OwnerNetwork VlanNetworkState
+	PodName      string
 }
 
 func (a *SpawnInterfaceAction) Do(ctx context.Context, r *VlanmanReconciler) error {
-	log := log.FromContext(ctx)
 	pod := corev1.Pod{}
 	podNsn := types.NamespacedName{Name: a.PodName, Namespace: r.Env.NamespaceName}
 	err := r.Client.Get(ctx, podNsn, &pod)
@@ -395,9 +392,13 @@ func (a *SpawnInterfaceAction) Do(ctx context.Context, r *VlanmanReconciler) err
 		return err
 	}
 
-	log.Info("Creating job", "target", pod.Name)
-	job := interfaceFromDaemon(pod, pid, int(a.VlanId), r.Env.TTL, r.Env.InterfacePodImage, a.NetworkName, r.Env.InterfacePodPullPolicy, a.Mappings, true)
-	err = r.Client.Create(ctx, &job)
+	job := interfaceFromDaemon(pod, pid, int(a.OwnerNetwork.VlanId), r.Env.TTL, r.Env.InterfacePodImage, a.OwnerNetwork.Name, r.Env.InterfacePodPullPolicy, a.OwnerNetwork.Mappings, true)
+	return a.execute(ctx, r, job)
+}
+
+func (a *SpawnInterfaceAction) execute(ctx context.Context, r *VlanmanReconciler, job batchv1.Job) error {
+	log := log.FromContext(ctx)
+	err := r.Client.Create(ctx, &job)
 	if err != nil {
 		if apierrors.IsAlreadyExists(err) {
 			existingJob := batchv1.Job{}
@@ -470,13 +471,13 @@ func (a *SpawnInterfaceAction) Do(ctx context.Context, r *VlanmanReconciler) err
 	log.Info("Job finished")
 	if tries == 31 {
 		return &errs.InternalError{
-			Context: fmt.Sprintf("Error waiting for vlan interface creation job to complete on manager: %s", pod.Name),
+			Context: fmt.Sprintf("Error waiting for vlan interface creation job to complete: %s", job.Name),
 		}
 	}
 	vlan := vlanmanv1.VlanNetwork{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: a.NetworkName, Namespace: ""}, &vlan)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: a.OwnerNetwork.Name, Namespace: ""}, &vlan)
 	if err != nil {
-		return errs.NewClientRequestError(fmt.Sprintf("Get vlan network %s", a.NetworkName), err)
+		return errs.NewClientRequestError(fmt.Sprintf("Get vlan network %s", a.OwnerNetwork.Name), err)
 	}
 	if vlan.Status.State == nil {
 		vlan.Status.State = make(map[string]vlanmanv1.ConnectionState)
@@ -485,7 +486,7 @@ func (a *SpawnInterfaceAction) Do(ctx context.Context, r *VlanmanReconciler) err
 	vlan.Status.UpdateShortState()
 	err = r.Client.Status().Update(ctx, &vlan)
 	if err != nil {
-		return errs.NewClientRequestError(fmt.Sprintf("Update status of vlan network %s", a.NetworkName), err)
+		return errs.NewClientRequestError(fmt.Sprintf("Update status of vlan network %s", a.OwnerNetwork.Name), err)
 	}
 	return nil
 }
@@ -522,4 +523,27 @@ func requestManagerPID(IP string) (int, error) {
 		}
 	}
 	return PID.PID, nil
+}
+
+type UpdateManagerAction struct {
+	OwnerNetwork VlanNetworkState
+	Manager      ManagerSet
+}
+
+func (a *UpdateManagerAction) Do(ctx context.Context, r *VlanmanReconciler) error {
+	desiredDs, err := daemonSetFromManager(a.Manager, r.Env)
+	// currentDs := appsv1.DaemonSet{}
+	// if err != nil {
+	// 	return &errs.InternalError{Context: fmt.Sprintf("Couldn't convert managerset object to daemonset: %s", err)}
+	// }
+	// err = r.Client.Get(ctx, types.NamespacedName{Name: desiredDs.Name, Namespace: desiredDs.Namespace}, &currentDs)
+	// if err != nil {
+	// 	return errs.NewClientRequestError("Get daemonset", err)
+	// }
+
+	err = r.Client.Update(ctx, &desiredDs)
+	if err != nil {
+		return errs.NewClientRequestError("Update daemonset", err)
+	}
+	return nil
 }

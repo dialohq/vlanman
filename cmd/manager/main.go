@@ -541,7 +541,7 @@ func downgradeStatus(k8sclient client.Client, ctx context.Context, logger slog.L
 		connection.Status.State = make(map[string]vlanmanv1.ConnectionState)
 	}
 	connection.Status.State[hostname] = vlanmanv1.StateDown
-	connection.Status.ShortState = vlanmanv1.StateDown
+	connection.Status.UpdateShortState()
 	err = k8sclient.Status().Update(ctx, &connection)
 	if err != nil {
 		logger.Error("Failed to update vlan connections tatus", "err", err)

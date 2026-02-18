@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -101,18 +103,19 @@ type VlanNetworkStatus struct {
 	// PendingIPs contains IP addresses that are pending allocation, grouped by pool and request
 	PendingIPs map[string]map[string]string `json:"pendingIPs"`
 	State      map[string]ConnectionState   `json:"status"`
-	ShortState ConnectionState              `json:"shortState"`
+	ShortState string                       `json:"shortState"`
 }
 
 func (s *VlanNetworkStatus) UpdateShortState() {
-	state := StateUp
+	state := "Healthy"
+	downCounter := 0
 	for _, v := range s.State {
 		if v != StateUp {
-			state = StateDown
-			break
+			state = "Unhealthy"
+			downCounter += 1
 		}
 	}
-	s.ShortState = state
+	s.ShortState = fmt.Sprintf("%s (%d/%d)", state, len(s.State)-downCounter, len(s.State))
 }
 
 func init() {

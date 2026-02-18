@@ -23,16 +23,7 @@ type ManagerSet struct {
 }
 
 func managerCmp(a, b ManagerSet) int {
-	c := strings.Compare(a.OwnerNetworkName, b.OwnerNetworkName)
-	if c == 0 {
-		if a.VlanID < b.VlanID {
-			return -1
-		} else if a.VlanID > b.VlanID {
-			return 1
-		}
-		return 0
-	}
-	return c
+	return strings.Compare(a.OwnerNetworkName, b.OwnerNetworkName)
 }
 
 func daemonSetFromManager(mgr ManagerSet, e Envs) (appsv1.DaemonSet, error) {
@@ -67,6 +58,9 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) (appsv1.DaemonSet, error) {
 				MatchLabels: map[string]string{
 					vlanmanv1.ManagerSetLabelKey: mgr.OwnerNetworkName,
 				},
+			},
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.OnDeleteDaemonSetStrategyType,
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

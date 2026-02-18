@@ -100,10 +100,10 @@ func (r *VlanmanReconciler) getCurrentState(ctx context.Context) ([]ManagerSet, 
 	connStates := make([]VlanNetworkState, len(vlans.Items))
 	for _, conn := range vlans.Items {
 		connStates = append(connStates, VlanNetworkState{
-			Status:      conn.Status.State,
-			VlanId:      conn.Spec.VlanID,
-			Mappings:    conn.Spec.Mappings,
-			NetworkName: conn.Name,
+			Status:   conn.Status.State,
+			VlanId:   conn.Spec.VlanID,
+			Mappings: conn.Spec.Mappings,
+			Name:     conn.Name,
 		})
 	}
 
@@ -147,15 +147,19 @@ func (r *VlanmanReconciler) createDesiredState(networks []vlanmanv1.VlanNetwork)
 	return mgrs
 }
 
-func (r *VlanmanReconciler) diffManagers(desired, current ManagerSet) []Action {
-	eq := true
-	eq = eq && desired.OwnerNetworkName == current.OwnerNetworkName
-	eq = eq && desired.VlanID == current.VlanID
-	if !eq {
-		return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
-	}
-	if !reflect.DeepEqual(current.ManagerAffinity, desired.ManagerAffinity) {
-		return []Action{&DeleteManagerAction{current}, &CreateManagerAction{desired}}
+func (r *VlanmanReconciler) diffManagers(desired, current ManagerSet, network VlanNetworkState) []Action {
+	// eq := true
+	// eq = eq && desired.OwnerNetworkName == current.OwnerNetworkName
+	// eq = eq && desired.VlanID == current.VlanID
+
+	// if !eq {
+	// 	return []Action{&DeleteManagerAction{Manager: current, OwnerNetwork: network}, &CreateManagerAction{Manager: desired, OwnerNetwork: network}}
+	// }
+	// if !reflect.DeepEqual(current.ManagerAffinity, desired.ManagerAffinity) {
+	// 	return []Action{&DeleteManagerAction{Manager: current, OwnerNetwork: network}, &CreateManagerAction{Manager: desired, OwnerNetwork: network}}
+	// }
+	if !reflect.DeepEqual(desired, current) {
+		return []Action{&UpdateManagerAction{Manager: desired, OwnerNetwork: network}}
 	}
 	return []Action{}
 }
@@ -167,10 +171,8 @@ func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet, currentCon
 		for podName, podStatus := range conn.Status {
 			if podStatus != vlanmanv1.StateUp {
 				acts = append(acts, &SpawnInterfaceAction{
-					PodName:     podName,
-					VlanId:      conn.VlanId,
-					Mappings:    conn.Mappings,
-					NetworkName: conn.NetworkName,
+					PodName:      podName,
+					OwnerNetwork: conn,
 				})
 			}
 		}
@@ -179,14 +181,29 @@ func (r *VlanmanReconciler) diffStates(desired, current []ManagerSet, currentCon
 	// sort for searching
 	slices.SortFunc(desired, managerCmp)
 	slices.SortFunc(current, managerCmp)
+	slices.SortFunc(currentConns, func(a, b VlanNetworkState) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	for _, desiredMgr := range desired {
 		idx, found := slices.BinarySearchFunc(current, desiredMgr, managerCmp)
-		if !found {
-			acts = append(acts, &CreateManagerAction{Manager: desiredMgr})
+		netIdx := -1
+		for i, ns := range currentConns {
+			if ns.Name == desiredMgr.OwnerNetworkName {
+				netIdx = i
+			}
+		}
+		if netIdx == -1 {
+			log.FromContext(context.TODO()).Info("Network not found for a manager", "networkName", desiredMgr.OwnerNetworkName)
 			continue
 		}
-		acts = append(acts, r.diffManagers(desiredMgr, current[idx])...)
+
+		if !found {
+			acts = append(acts, &CreateManagerAction{Manager: desiredMgr, OwnerNetwork: currentConns[netIdx]})
+			continue
+		}
+
+		acts = append(acts, r.diffManagers(desiredMgr, current[idx], currentConns[netIdx])...)
 	}
 
 	for _, currentMgr := range current {
@@ -276,6 +293,18 @@ func (r *VlanmanReconciler) updateVlanNetworkStatus(ctx context.Context, net *vl
 	if net.Status.State == nil {
 		net.Status.State = map[string]vlanmanv1.ConnectionState{}
 	}
+	daemons := corev1.PodList{}
+	err := r.Client.List(ctx, &daemons, &client.ListOptions{
+		Namespace: r.Env.NamespaceName,
+	})
+	daemonNames := make([]string, len(daemons.Items))
+	for _, it := range daemons.Items {
+		daemonNames = append(daemonNames, it.Name)
+	}
+
+	maps.DeleteFunc(net.Status.State, func(k string, v vlanmanv1.ConnectionState) bool {
+		return !slices.Contains(daemonNames, k)
+	})
 
 	for name := range net.Status.FreeIPs {
 		if !slices.ContainsFunc(net.Spec.Pools, poolName(name)) {

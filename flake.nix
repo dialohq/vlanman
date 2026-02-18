@@ -214,7 +214,6 @@
             pkgs.tokei # loc count
             pkgs.skopeo
             pkgs.claude-code
-            pkgs.codex
             pkgs.glow
             pkgs.mods
             pkgs.graphviz
@@ -228,7 +227,7 @@
             EDITOR = "hx";
           };
         };
-        version = "0.1.7";
+        version = "dev";
       }
     );
 }

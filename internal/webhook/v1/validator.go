@@ -160,9 +160,16 @@ func (uv *UpdateValidator) Validate() error {
 		return fmt.Errorf("Couldn't validate minimum node requirement: %w", err)
 	}
 
-	// don't allow any changes besides pools
 	uv.NewNetwork.Spec.Pools = nil
 	uv.OldNetwork.Spec.Pools = nil
+	uv.NewNetwork.Spec.ManagerAffinity = nil
+	uv.OldNetwork.Spec.ManagerAffinity = nil
+	uv.NewNetwork.Spec.Mappings = nil
+	uv.OldNetwork.Spec.Mappings = nil
+	uv.NewNetwork.Spec.Gateways = nil
+	uv.OldNetwork.Spec.Gateways = nil
+	uv.NewNetwork.Spec.VlanID = 0
+	uv.OldNetwork.Spec.VlanID = 0
 	if !reflect.DeepEqual(uv.NewNetwork.Spec, uv.OldNetwork.Spec) {
 		return fmt.Errorf("The only field in spec that supports update is 'pools'.")
 	}
