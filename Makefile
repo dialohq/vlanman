@@ -1,6 +1,6 @@
-VERSION ?= 0.1.7
+VERSION ?= 0.1.8
 DOCKERHUB_USER ?= plan9better
-LOCAL_REGISTRY ?= 192.168.10.201:5000
+LOCAL_REGISTRY ?= localhost:15000
 
 .PHONY: publish test all vlanman unit-test e2e-test test-all
 
