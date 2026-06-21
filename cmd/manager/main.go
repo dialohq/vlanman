@@ -231,7 +231,7 @@ func removeIPAddress() {
 		os.Exit(1)
 	}
 	for _, ipnet := range gatewayIPNets {
-		err = ip.AddrAdd(link, &ip.Addr{IPNet: &ipnet})
+		err = ip.AddrDel(link, &ip.Addr{IPNet: &ipnet})
 		if err != nil && !isFileExistsErr(err) {
 			logger.Error("Failed to delete IP address to VLAN when stopped leading", "msg", &errs.UnrecoverableError{
 				Context: "Error deleting ip address from vlan on stopped leading in callback",
@@ -407,10 +407,20 @@ func interfaceSetup(ctx context.Context, e Envs, k8sclient client.Client) {
 		downgradeStatus(k8sclient, ctx, logger, envs.ownerNetName, hostname)
 	}
 
-	err = vlanWatcher.Watch(downgrade, logger)
-	if err != nil {
-		logger.Error("Error creating vlan watcher", "msg", &errs.UnrecoverableError{Context: "Couldn't create a vlan watcher", Err: err})
-		os.Exit(1)
+	go func() {
+		err = vlanWatcher.Watch(downgrade, logger)
+		if err != nil {
+			logger.Error("Error creating vlan watcher", "msg", &errs.UnrecoverableError{Context: "Couldn't create a vlan watcher", Err: err})
+			os.Exit(1)
+		}
+	}()
+
+	for {
+		if vlanWatcher.UP.Load() {
+			break
+		}
+		logger.Info("Waiting for vlan interface to come up")
+		time.Sleep(time.Second / 2)
 	}
 
 	if len(e.Gateways) == 0 {
