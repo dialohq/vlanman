@@ -53,7 +53,7 @@ func main() {
 		})
 
 	}
-	re := regexp.MustCompile(`[0-9]\+`)
+	re := regexp.MustCompile(`[0-9]+`)
 
 	nsid, err := strconv.ParseInt(re.FindString(string(cmdOutput)), 10, 64)
 	if err != nil {
