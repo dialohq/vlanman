@@ -213,7 +213,6 @@
             # misc
             pkgs.tokei # loc count
             pkgs.skopeo
-            pkgs.claude-code
             pkgs.glow
             pkgs.mods
             pkgs.graphviz

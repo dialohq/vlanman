@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -35,8 +36,9 @@ func main() {
 	networkName := os.Getenv("VLAN_NETWORK")
 	url := fmt.Sprintf("http://%s-service.vlanman-system:61410/macvlan", networkName)
 
-	cmd := exec.Command("bash", "-c", "readlink /proc/$$/ns/net | grep -o '[0-9]\\+'")
-	nsidStr, err := cmd.Output()
+	cmd := exec.Command("readlink", fmt.Sprintf("/proc/%d/ns/net", os.Getpid()))
+
+	cmdOutput, err := cmd.Output()
 	if err != nil {
 		exErr, ok := err.(*exec.ExitError)
 		if !ok {
@@ -51,7 +53,9 @@ func main() {
 		})
 
 	}
-	nsid, err := strconv.ParseInt(strings.TrimSpace(string(nsidStr)), 10, 64)
+	re := regexp.MustCompile(`[0-9]\+`)
+
+	nsid, err := strconv.ParseInt(re.FindString(string(cmdOutput)), 10, 64)
 	if err != nil {
 		fatal(errs.NewParsingError("nsid", err))
 	}
