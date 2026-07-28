@@ -30,6 +30,7 @@ controller:
 manager:
   image: "plan9better/vlan-manager:0.1.8"
   pullPolicy: IfNotPresent
+  gratuitousArpCount: 2 # 1-255, sent when a manager becomes leader
 worker:
   image: "plan9better/vlan-worker:0.1.8"
   pullPolicy: IfNotPresent

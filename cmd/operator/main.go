@@ -78,6 +78,7 @@ func main() {
 		MonitoringReleaseName:        os.Getenv("MONITORING_RELEASE_NAME"),
 		VlanManagerImage:             os.Getenv("MANAGER_POD_IMAGE"),
 		VlanManagerPullPolicy:        os.Getenv("MANAGER_PULL_POLICY"),
+		GratuitousArpCount:           os.Getenv("GRATUITOUS_ARP_COUNT"),
 		InterfacePodImage:            os.Getenv("INTERFACE_POD_IMAGE"),
 		InterfacePodPullPolicy:       os.Getenv("INTERFACE_PULL_POLICY"),
 		WorkerInitImage:              os.Getenv("WORKER_IMAGE"),

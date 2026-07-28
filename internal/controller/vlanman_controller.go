@@ -50,6 +50,7 @@ type Envs struct {
 	WorkerInitImage              string
 	WorkerInitPullPolicy         string
 	ServiceAccountName           string
+	GratuitousArpCount           string
 }
 
 type VlanmanReconciler struct {

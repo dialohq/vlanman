@@ -108,6 +108,10 @@ func daemonSetFromManager(mgr ManagerSet, e Envs) (appsv1.DaemonSet, error) {
 									Name:  "GATEWAYS",
 									Value: gateways,
 								},
+								{
+									Name:  "GRATUITOUS_ARP_COUNT",
+									Value: e.GratuitousArpCount,
+								},
 							},
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{

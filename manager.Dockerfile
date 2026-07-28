@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/build GOOS=linux GOARCH=${PLATFORM} CGO_ENABLED=0
 
 FROM ubuntu:latest
 
-RUN apt update -y && apt install -y iproute2
+RUN apt update -y && apt install -y iproute2 iputils-arping
 
 WORKDIR /
 

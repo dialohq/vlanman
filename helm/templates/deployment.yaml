@@ -51,6 +51,8 @@ spec:
               value: "{{ .Values.manager.image }}"
             - name: MANAGER_PULL_POLICY
               value: "{{ .Values.manager.pullPolicy }}"
+            - name: GRATUITOUS_ARP_COUNT
+              value: "{{ .Values.manager.gratuitousArpCount }}"
             - name: INTERFACE_POD_IMAGE
               value: "{{ .Values.interface.image }}"
             - name: INTERFACE_PULL_POLICY

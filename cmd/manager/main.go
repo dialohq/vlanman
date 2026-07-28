@@ -200,6 +200,17 @@ func macvlan(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func arping(link ip.Link, addr net.IP) {
+	logger.Info("Sending gratuitous arp", "interface", link.Attrs().Name, "address", addr.String(), "count", envs.GratuitousArpCount)
+	cmd := exec.Command("arping", "-U", "-I", link.Attrs().Name, "-c", envs.GratuitousArpCount, addr.String())
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Error("Failed to send gratuitous arp", "error", err, "output", string(out))
+		os.Exit(1)
+	}
+	logger.Info("Arping succeeded", "output", string(out))
+}
+
 func addIPAddress(ctx context.Context) {
 	link, err := ip.LinkByName("macvlangw" + strconv.FormatInt(int64(envs.vlanID), 10))
 	if err != nil {
@@ -218,6 +229,7 @@ func addIPAddress(ctx context.Context) {
 			})
 			os.Exit(1)
 		}
+		go arping(link, ipnet.IP)
 	}
 	setupRoutes()
 }
@@ -333,7 +345,11 @@ type Envs struct {
 	vlanID       int
 	lockName     string
 	Gateways     []vlanmanv1.Gateway
+
+	GratuitousArpCount string
 }
+
+const defaultGARPCount = "2"
 
 func getEnvs() Envs {
 	klog.InitFlags(nil)
@@ -343,6 +359,18 @@ func getEnvs() Envs {
 	ownerNetName := os.Getenv("OWNER_NETWORK")
 	if ownerNetName == "" {
 		logger.Error("Owner network name env var is not set", "msg", errs.ErrNilUnrecoverable)
+		os.Exit(1)
+	}
+
+	gArpCnt := os.Getenv("GRATUITOUS_ARP_COUNT")
+	if gArpCnt == "" {
+		logger.Info("GRATUITOUS_ARP_COUNT not set or empty. Using default", "default", defaultGARPCount)
+		gArpCnt = defaultGARPCount
+	}
+
+	garpCount, err := strconv.ParseUint(gArpCnt, 10, 8)
+	if err != nil || garpCount == 0 {
+		logger.Error("GRATUITOUS_ARP_COUNT has to be in range 1-255", "current", gArpCnt)
 		os.Exit(1)
 	}
 
@@ -378,11 +406,12 @@ func getEnvs() Envs {
 	}
 
 	return Envs{
-		ownerNetName: ownerNetName,
-		namespace:    namespace,
-		lockName:     lockName,
-		Gateways:     gateways,
-		vlanID:       vlanID,
+		ownerNetName:       ownerNetName,
+		namespace:          namespace,
+		lockName:           lockName,
+		Gateways:           gateways,
+		vlanID:             vlanID,
+		GratuitousArpCount: gArpCnt,
 	}
 }
 
